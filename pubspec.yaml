@@ -1,0 +1,44 @@
+name: koshika
+description: "Your health data lives in your cell, not the cloud. Offline-first biomarker tracking with on-device AI."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Local database
+  objectbox: ^5.2.0
+  objectbox_flutter_libs: any
+
+  # File handling
+  file_picker: ^8.1.6
+  path_provider: ^2.1.5
+  share_plus: ^10.1.4
+  path: ^1.9.1
+
+  # Charts & visualization
+  fl_chart: ^0.70.2
+
+  # Utilities
+  intl: ^0.20.2
+  string_similarity: ^2.0.0
+  collection: ^1.19.1
+  uuid: ^4.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: any
+  objectbox_generator: any
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    - assets/data/
