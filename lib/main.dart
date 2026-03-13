@@ -1,6 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
 import 'services/objectbox_store.dart';
 import 'services/biomarker_dictionary.dart';
+import 'services/pdf_import_service.dart';
+import 'services/pdf_text_extractor.dart';
+import 'services/lab_report_parser.dart';
+import 'screens/report_detail_screen.dart';
 
 /// Global references — initialized in main() before runApp.
 late final ObjectBoxStore objectbox;
@@ -270,8 +279,112 @@ class DashboardPlaceholder extends StatelessWidget {
   }
 }
 
-class ReportsPlaceholder extends StatelessWidget {
+class ReportsPlaceholder extends StatefulWidget {
   const ReportsPlaceholder({super.key});
+
+  @override
+  State<ReportsPlaceholder> createState() => _ReportsPlaceholderState();
+}
+
+class _ReportsPlaceholderState extends State<ReportsPlaceholder> {
+  bool _isImporting = false;
+
+  Future<void> _importPdf() async {
+    if (_isImporting) return;
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result == null || result.files.single.path == null) return;
+      
+      final String sourcePath = result.files.single.path!;
+      
+      setState(() {
+        _isImporting = true;
+      });
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 24),
+                Text('Importing lab report...'),
+              ],
+            ),
+          ),
+        );
+      }
+
+      final File sourceFile = File(sourcePath);
+      final Directory appDocsDir = await getApplicationDocumentsDirectory();
+      final String destFileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(sourcePath)}';
+      final String destPath = p.join(appDocsDir.path, destFileName);
+      
+      await sourceFile.copy(destPath);
+
+      final extractor = PdfTextExtractorService();
+      final parser = LabReportParser();
+      final service = PdfImportService(extractor, parser, biomarkerDictionary, objectbox);
+      
+      final importResult = await service.importPdf(destPath);
+
+      setState(() {
+        _isImporting = false;
+      });
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Close dialog
+      }
+
+      if (mounted) {
+        if (importResult.success) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text('Imported ${importResult.successfulMatches} biomarkers')),
+           );
+           
+           // Navigate to report details
+           if (importResult.report != null) {
+              Navigator.of(context).push(MaterialPageRoute(
+                 builder: (context) => ReportDetailScreen(reportId: importResult.report!.id),
+              )).then((_) {
+                 setState(() {}); // refresh reports list
+              });
+           } else {
+             setState(() {});
+           }
+        } else {
+           showDialog(
+             context: context,
+             builder: (context) => AlertDialog(
+               title: const Text('Import Failed'),
+               content: Text(importResult.errorMessage ?? 'Unknown error'),
+               actions: [
+                 TextButton(
+                   onPressed: () => Navigator.of(context).pop(),
+                   child: const Text('OK'),
+                 ),
+               ],
+             ),
+           );
+        }
+      }
+    } catch (e) {
+       setState(() { _isImporting = false; });
+       if (mounted) {
+           if (Navigator.canPop(context)) Navigator.of(context).pop();
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text('Error: $e')),
+           );
+       }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -283,14 +396,9 @@ class ReportsPlaceholder extends StatelessWidget {
         title: const Text('Reports'),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          // TODO: Wire up PDF import flow (Day 4)
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('PDF import coming in Day 2!')),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Import PDF'),
+        onPressed: _isImporting ? null : _importPdf,
+        icon: _isImporting ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add),
+        label: Text(_isImporting ? 'Importing...' : 'Import PDF'),
       ),
       body: reports.isEmpty
           ? Center(
@@ -328,6 +436,11 @@ class ReportsPlaceholder extends StatelessWidget {
                 final report = reports[index];
                 return Card(
                   child: ListTile(
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute(
+                         builder: (context) => ReportDetailScreen(reportId: report.id),
+                      ));
+                    },
                     leading: CircleAvatar(
                       backgroundColor: theme.colorScheme.primaryContainer,
                       child: Icon(
