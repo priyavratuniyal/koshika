@@ -100,16 +100,19 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final _screens = const [
-    DashboardPlaceholder(),
-    ReportsPlaceholder(),
-    ChatPlaceholder(),
-  ];
+  Widget _buildCurrentScreen() {
+    switch (_currentIndex) {
+      case 0: return const DashboardPlaceholder();
+      case 1: return const ReportsPlaceholder();
+      case 2: return const ChatPlaceholder();
+      default: return const DashboardPlaceholder();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: _buildCurrentScreen(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {

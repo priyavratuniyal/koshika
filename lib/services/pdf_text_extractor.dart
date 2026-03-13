@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 class PdfExtractionResult {
@@ -69,7 +69,9 @@ class PdfTextExtractorService {
       document.dispose();
 
       final String fullText = fullTextBuffer.toString();
-      final bool isEmpty = fullText.length < 50;
+      // Check emptiness based on actual page text, not including our separator markers
+      final int actualTextLength = pageTexts.fold(0, (sum, t) => sum + t.trim().length);
+      final bool isEmpty = actualTextLength < 50;
 
       String? detectedLabName;
       DateTime? detectedReportDate;

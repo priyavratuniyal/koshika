@@ -35,11 +35,13 @@ class LabReportParser {
 
   /// Keywords that indicate a line is a header/footer, not a data row
   static const List<String> _ignoredLineKeywords = [
-    'patient', 'name', 'age', 'sex', 'gender', 'sample',
-    'barcode', 'report', 'date', 'collected', 'received',
-    'doctor', 'ref by', 'referred', 'page', 'signature',
-    'end of report', 'laboratory', 'test name', 'value', 'unit', 'reference',
-    'biological reference interval', 'method'
+    'patient ', 'patient:', 'name ', 'name:', 'age ', 'age:', 'sex ', 'sex:', 'gender ', 'gender:', 'sample ', 'sample:',
+    'barcode', 'report id', 'report no', 'report date', 'reported on', 'reported at',
+    'date of', 'date:', 'collected', 'received',
+    'doctor', 'ref by', 'referred', 'page ', 'page:', 'signature',
+    'end of report', 'laboratory', 'test name', 'unit', 'reference',
+    'biological reference interval', 'method',
+    '--- page',  // Page separator injected by PdfTextExtractorService
   ];
 
   /* 
@@ -76,9 +78,6 @@ class LabReportParser {
       // Skip empty lines or very long lines (likely paragraphs)
       if (line.isEmpty || line.length > 200) continue;
 
-      // Clean up common OCR artifacts or strange spacing
-      line = line.replaceAll(RegExp(r'\s+'), ' ').trim();
-
       // 1. Check if line is an ignored header/footer
       final lowerLine = line.toLowerCase();
       bool shouldIgnore = false;
@@ -102,8 +101,14 @@ class LabReportParser {
       }
       if (foundSection) continue;
 
-      // 3. Try to match data row patterns
+      // 3. Try to match data row patterns on the original spacing
       RawLabRow? row = _tryPatterns(line, currentSection);
+
+      // 4. If nothing matched, clean up common OCR artifacts or strange spacing and try again
+      if (row == null) {
+        final cleanLine = line.replaceAll(RegExp(r'\s+'), ' ').trim();
+        row = _tryPatterns(cleanLine, currentSection);
+      }
 
       // Handle multiline test names (e.g., test name split over two lines)
       if (row == null && i < lines.length - 1) {
@@ -113,6 +118,12 @@ class LabReportParser {
             // This line is just text, next line has the data. Combine them.
             final combinedLine = '$line $nextLine';
             row = _tryPatterns(combinedLine, currentSection);
+            
+            if (row == null) {
+               final cleanCombinedLine = combinedLine.replaceAll(RegExp(r'\s+'), ' ').trim();
+               row = _tryPatterns(cleanCombinedLine, currentSection);
+            }
+            
             if (row != null) {
               i++; // Skip the next line since we consumed it
             }

@@ -11,41 +11,31 @@ class ReportDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
-    // Using a FutureBuilder simple pattern
-    return FutureBuilder<List<BiomarkerResult>>(
-      future: Future.value(objectbox.getResultsForReport(reportId)),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+    // Let's get the report object directly
+    final report = objectbox.labReportBox.get(reportId);
+    if (report == null) {
+      return Scaffold(
+         appBar: AppBar(title: const Text('Report Details')),
+         body: const Center(child: Text('Report not found')),
+      );
+    }
 
-        final results = snapshot.data!;
-        
-        // Let's get the report object directly
-        final report = objectbox.labReportBox.get(reportId);
-        if (report == null) {
-          return Scaffold(
-             appBar: AppBar(title: const Text('Report Details')),
-             body: const Center(child: Text('Report not found')),
-          );
-        }
+    final results = objectbox.getResultsForReport(reportId);
 
-        // Group by category
-        final groupedResults = <String, List<BiomarkerResult>>{};
-        for (final r in results) {
-           final cat = r.category ?? 'Other';
-           groupedResults.putIfAbsent(cat, () => []).add(r);
-        }
+    // Group by category
+    final groupedResults = <String, List<BiomarkerResult>>{};
+    for (final r in results) {
+       final cat = r.category ?? 'Other';
+       groupedResults.putIfAbsent(cat, () => []).add(r);
+    }
 
-        final outOfRangeCount = results.where((r) => r.flag == BiomarkerFlag.high || r.flag == BiomarkerFlag.low || r.flag == BiomarkerFlag.critical).length;
+    final outOfRangeCount = results.where((r) => r.flag == BiomarkerFlag.high || r.flag == BiomarkerFlag.low || r.flag == BiomarkerFlag.critical).length;
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(report.labName ?? report.originalFileName ?? 'Report Details'),
-          ),
-          body: results.isEmpty 
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(report.labName ?? report.originalFileName ?? 'Report Details'),
+      ),
+      body: results.isEmpty 
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
@@ -154,8 +144,6 @@ class ReportDetailScreen extends StatelessWidget {
                   ],
                 ),
         );
-      },
-    );
   }
 
   Widget _buildFlagBadge(BiomarkerFlag flag, ThemeData theme) {

@@ -1,4 +1,3 @@
-
 import 'package:path/path.dart' as p;
 
 import '../models/models.dart';
@@ -66,20 +65,19 @@ class PdfImportService {
       for (final row in candidateRows) {
         final BiomarkerMatch? match = _dictionary.fuzzyMatch(row.testName);
 
-        if (match != null && match.score >= 0.5) {
+        if (match != null) {
           final def = match.definition;
           
-          // Check for better match if we already found this biomarker
+          // De-duplication: if we already matched this biomarker key,
+          // only override if the new row has a value and the existing one doesn't.
           if (bestMatches.containsKey(def.key)) {
-             // Basic de-duplication: we'll just keep the first one found or we could compare scores 
-             // if we kept the raw score in the BiomarkerResult. For simplicity, we just keep the first valid one.
-             // Or better: over-write if this row has actual values and the old one didn't.
              final existing = bestMatches[def.key]!;
-             if (existing.value == null && row.valueStr != null) {
-                // If the new row has a value and old doesn't, override.
-             } else {
-                continue; // Skip duplicate
+             final bool existingHasNoValue = existing.value == null;
+             final bool newRowHasValue = row.valueStr != null && row.valueStr!.trim().isNotEmpty;
+             if (!(existingHasNoValue && newRowHasValue)) {
+                continue; // Keep existing, skip this duplicate
              }
+             // Otherwise fall through to override with the better row
           }
 
           // Parse value
@@ -149,6 +147,7 @@ class PdfImportService {
       final String originalFileName = p.basename(filePath);
       
       final LabReport report = LabReport(
+        labName: extractResult.labName,
         reportDate: extractResult.reportDate ?? DateTime.now(),
         pdfPath: filePath,
         originalFileName: originalFileName,
@@ -158,16 +157,14 @@ class PdfImportService {
       );
       report.patient.target = _store.getOrCreateDefaultPatient();
 
-      // Save to database
-      if (successCount > 0 || totalRows > 0) {
-        try {
-          _store.saveReportWithResults(report, finalResults);
-        } catch (e) {
-          return ImportResult(
-            success: false,
-            errorMessage: 'Failed to save results to database: $e',
-          );
-        }
+      // Always save the report so it appears in history, even with 0 results
+      try {
+        _store.saveReportWithResults(report, finalResults);
+      } catch (e) {
+        return ImportResult(
+          success: false,
+          errorMessage: 'Failed to save results to database: $e',
+        );
       }
 
       return ImportResult(
