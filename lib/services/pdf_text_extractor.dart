@@ -25,11 +25,21 @@ class PdfTextExtractorService {
 
   /// Known Indian lab names for auto-detection
   static const List<String> _knownLabs = [
-    'thyrocare', 'dr lal', 'dr. lal', 'srl', 'metropolis',
-    'redcliffe', 'pathkind', 'suburban', 'agilus', 'lucid'
+    'thyrocare',
+    'dr lal',
+    'dr. lal',
+    'srl',
+    'metropolis',
+    'redcliffe',
+    'pathkind',
+    'suburban',
+    'agilus',
+    'lucid',
   ];
 
-  static final RegExp _dateRegex = RegExp(r'(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})');
+  static final RegExp _dateRegex = RegExp(
+    r'(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})',
+  );
 
   /// Extracts all text from a PDF file at the given path.
   Future<PdfExtractionResult> extractText(String filePath) async {
@@ -40,16 +50,20 @@ class PdfTextExtractorService {
       }
 
       final Uint8List bytes = await file.readAsBytes();
-      
+
       PdfDocument document;
       try {
         document = PdfDocument(inputBytes: bytes);
       } catch (e) {
-        throw const FormatException('This file does not appear to be a valid or supported PDF.');
+        throw const FormatException(
+          'This file does not appear to be a valid or supported PDF.',
+        );
       }
 
       final int pageCount = document.pages.count;
-      final int pagesToProcess = pageCount > _maxPagesToExtract ? _maxPagesToExtract : pageCount;
+      final int pagesToProcess = pageCount > _maxPagesToExtract
+          ? _maxPagesToExtract
+          : pageCount;
 
       final List<String> pageTexts = [];
       final StringBuffer fullTextBuffer = StringBuffer();
@@ -58,8 +72,11 @@ class PdfTextExtractorService {
       final PdfTextExtractor extractor = PdfTextExtractor(document);
 
       for (int i = 0; i < pagesToProcess; i++) {
-        final String pageText = extractor.extractText(startPageIndex: i, endPageIndex: i);
-        
+        final String pageText = extractor.extractText(
+          startPageIndex: i,
+          endPageIndex: i,
+        );
+
         pageTexts.add(pageText);
         fullTextBuffer.writeln('--- PAGE ${i + 1} ---');
         fullTextBuffer.writeln(pageText);
@@ -70,7 +87,10 @@ class PdfTextExtractorService {
 
       final String fullText = fullTextBuffer.toString();
       // Check emptiness based on actual page text, not including our separator markers
-      final int actualTextLength = pageTexts.fold(0, (sum, t) => sum + t.trim().length);
+      final int actualTextLength = pageTexts.fold(
+        0,
+        (sum, t) => sum + t.trim().length,
+      );
       final bool isEmpty = actualTextLength < 50;
 
       String? detectedLabName;
@@ -78,14 +98,19 @@ class PdfTextExtractorService {
 
       if (!isEmpty && pageTexts.isNotEmpty) {
         final String firstPageLower = pageTexts.first.toLowerCase();
-        
+
         // Detect lab name
         for (final lab in _knownLabs) {
           if (firstPageLower.contains(lab)) {
             // Capitalize properly for display
-            detectedLabName = lab.split(' ').map((word) => 
-              word.isEmpty ? '' : '${word[0].toUpperCase()}${word.substring(1)}'
-            ).join(' ');
+            detectedLabName = lab
+                .split(' ')
+                .map(
+                  (word) => word.isEmpty
+                      ? ''
+                      : '${word[0].toUpperCase()}${word.substring(1)}',
+                )
+                .join(' ');
             break;
           }
         }
@@ -102,9 +127,9 @@ class PdfTextExtractorService {
               int day = int.parse(parts[0]);
               int month = int.parse(parts[1]);
               int year = int.parse(parts[2]);
-              
+
               if (year < 100) year += 2000;
-              
+
               // Basic sanity check
               if (day > 0 && day <= 31 && month > 0 && month <= 12) {
                 detectedReportDate = DateTime(year, month, day);

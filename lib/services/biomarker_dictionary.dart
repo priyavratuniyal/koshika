@@ -87,7 +87,9 @@ class BiomarkerDictionary {
   Future<void> load() async {
     if (_isLoaded) return;
 
-    final jsonStr = await rootBundle.loadString('assets/data/biomarker_dictionary.json');
+    final jsonStr = await rootBundle.loadString(
+      'assets/data/biomarker_dictionary.json',
+    );
     final jsonList = json.decode(jsonStr) as List<dynamic>;
 
     for (final item in jsonList) {
@@ -189,7 +191,10 @@ class BiomarkerDictionary {
 
   /// Match multiple test names at once and return a map of matches.
   /// Useful for batch processing an entire lab report.
-  Map<String, BiomarkerMatch?> batchMatch(List<String> testNames, {double threshold = 0.5}) {
+  Map<String, BiomarkerMatch?> batchMatch(
+    List<String> testNames, {
+    double threshold = 0.5,
+  }) {
     final results = <String, BiomarkerMatch?>{};
     for (final name in testNames) {
       results[name] = fuzzyMatch(name, threshold: threshold);

@@ -51,9 +51,9 @@ class ObjectBoxStore {
 
   /// Get all biomarker results for a specific report
   List<BiomarkerResult> getResultsForReport(int reportId) {
-    final query = biomarkerResultBox.query(
-      BiomarkerResult_.report.equals(reportId),
-    ).build();
+    final query = biomarkerResultBox
+        .query(BiomarkerResult_.report.equals(reportId))
+        .build();
     final results = query.find();
     query.close();
     return results;
@@ -90,11 +90,14 @@ class ObjectBoxStore {
   /// Get count of out-of-range results from the latest values
   int getOutOfRangeCount() {
     final latest = getLatestResults();
-    return latest.values.where((r) =>
-      r.flag == BiomarkerFlag.high ||
-      r.flag == BiomarkerFlag.low ||
-      r.flag == BiomarkerFlag.critical
-    ).length;
+    return latest.values
+        .where(
+          (r) =>
+              r.flag == BiomarkerFlag.high ||
+              r.flag == BiomarkerFlag.low ||
+              r.flag == BiomarkerFlag.critical,
+        )
+        .length;
   }
 
   /// Store a parsed lab report with its biomarker results
@@ -113,9 +116,9 @@ class ObjectBoxStore {
   /// Delete a report and all its associated biomarker results
   void deleteReport(int reportId) {
     store.runInTransaction(TxMode.write, () {
-      final query = biomarkerResultBox.query(
-        BiomarkerResult_.report.equals(reportId),
-      ).build();
+      final query = biomarkerResultBox
+          .query(BiomarkerResult_.report.equals(reportId))
+          .build();
       final results = query.find();
       query.close();
 

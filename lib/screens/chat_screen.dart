@@ -8,9 +8,7 @@ class ChatScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI Chat'),
-      ),
+      appBar: AppBar(title: const Text('AI Chat')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -23,10 +21,7 @@ class ChatScreen extends StatelessWidget {
                 color: theme.colorScheme.primary.withValues(alpha: 0.5),
               ),
               const SizedBox(height: 24),
-              Text(
-                'AI Assistant',
-                style: theme.textTheme.headlineSmall,
-              ),
+              Text('AI Assistant', style: theme.textTheme.headlineSmall),
               const SizedBox(height: 8),
               Text(
                 'Download an on-device AI model to chat about your health data privately. Coming soon.',

@@ -62,10 +62,7 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
               const SizedBox(height: 16),
               Text(_errorMessage!),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadData,
-                child: const Text('Retry'),
-              ),
+              ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
             ],
           ),
         ),
@@ -86,9 +83,7 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
     final hasNumericValues = history.any((r) => r.value != null);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(latestResult.displayName),
-      ),
+      appBar: AppBar(title: Text(latestResult.displayName)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -172,7 +167,9 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
                       child: Text(
                         'LOINC: ${latestResult.loincCode}',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                     ),
@@ -206,11 +203,9 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
           ),
           const SizedBox(height: 16),
 
-          if (hasNumericValues)
-            BiomarkerTrendChart(history: history),
-          
-          if (hasNumericValues)
-            const SizedBox(height: 24),
+          if (hasNumericValues) BiomarkerTrendChart(history: history),
+
+          if (hasNumericValues) const SizedBox(height: 24),
 
           // History List
           Text(
@@ -220,7 +215,7 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           Card(
             clipBehavior: Clip.antiAlias,
             child: ListView.separated(
@@ -231,7 +226,7 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
               itemBuilder: (context, index) {
                 final result = history[index];
                 final report = result.report.target;
-                
+
                 return ListTile(
                   title: Row(
                     children: [

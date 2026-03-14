@@ -2,13 +2,7 @@ import 'package:objectbox/objectbox.dart';
 import 'lab_report.dart';
 
 /// Flag indicating whether a biomarker value is within reference range.
-enum BiomarkerFlag {
-  normal,
-  low,
-  high,
-  critical,
-  unknown,
-}
+enum BiomarkerFlag { normal, low, high, critical, unknown }
 
 /// Represents a single parsed biomarker result from a lab report.
 /// This is the core data unit of the app — each row in a lab report
@@ -111,10 +105,14 @@ class BiomarkerResult {
       }
     } else if (refHigh != null) {
       // Only upper bound (e.g., Cholesterol < 200)
-      flagIndex = v > refHigh! ? BiomarkerFlag.high.index : BiomarkerFlag.normal.index;
+      flagIndex = v > refHigh!
+          ? BiomarkerFlag.high.index
+          : BiomarkerFlag.normal.index;
     } else if (refLow != null) {
       // Only lower bound
-      flagIndex = v < refLow! ? BiomarkerFlag.low.index : BiomarkerFlag.normal.index;
+      flagIndex = v < refLow!
+          ? BiomarkerFlag.low.index
+          : BiomarkerFlag.normal.index;
     } else {
       flagIndex = BiomarkerFlag.unknown.index;
     }

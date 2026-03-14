@@ -40,10 +40,28 @@ class ReferenceRangeGauge extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (refLow != null)
-                Text('Low', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10, color: Colors.orange)),
-              Text('Normal', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10, color: Colors.green)),
+                Text(
+                  'Low',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: 10,
+                    color: Colors.orange,
+                  ),
+                ),
+              Text(
+                'Normal',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 10,
+                  color: Colors.green,
+                ),
+              ),
               if (refHigh != null)
-                Text('High', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10, color: Colors.red)),
+                Text(
+                  'High',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: 10,
+                    color: Colors.red,
+                  ),
+                ),
             ],
           ),
         ],
@@ -74,12 +92,12 @@ class _GaugePainter extends CustomPainter {
     // Calculate display range to ensure everything fits (pad by 20%)
     double displayMin = min(value, effectiveLow);
     double displayMax = max(value, effectiveHigh);
-    
+
     // Add 20% padding to display bounds, except don't go below 0 if all values are positive
     final rangePad = (displayMax - displayMin) * 0.2;
     displayMin = displayMin - rangePad;
     displayMax = displayMax + rangePad;
-    
+
     if (displayMin < 0 && value >= 0 && effectiveLow >= 0) {
       displayMin = 0;
     }
@@ -109,7 +127,11 @@ class _GaugePainter extends CustomPainter {
       // Low Zone
       paint.color = lowColor;
       canvas.drawRRect(
-        RRect.fromRectAndCorners(Rect.fromLTRB(0, 10, lowX, 18), topLeft: radius, bottomLeft: radius),
+        RRect.fromRectAndCorners(
+          Rect.fromLTRB(0, 10, lowX, 18),
+          topLeft: radius,
+          bottomLeft: radius,
+        ),
         paint,
       );
       // Normal Zone
@@ -118,31 +140,51 @@ class _GaugePainter extends CustomPainter {
       // High Zone
       paint.color = highColor;
       canvas.drawRRect(
-        RRect.fromRectAndCorners(Rect.fromLTRB(highX, 10, width, 18), topRight: radius, bottomRight: radius),
+        RRect.fromRectAndCorners(
+          Rect.fromLTRB(highX, 10, width, 18),
+          topRight: radius,
+          bottomRight: radius,
+        ),
         paint,
       );
     } else if (refLow != null) {
       // 2 zones (Low, Normal)
       paint.color = lowColor;
       canvas.drawRRect(
-        RRect.fromRectAndCorners(Rect.fromLTRB(0, 10, lowX, 18), topLeft: radius, bottomLeft: radius),
+        RRect.fromRectAndCorners(
+          Rect.fromLTRB(0, 10, lowX, 18),
+          topLeft: radius,
+          bottomLeft: radius,
+        ),
         paint,
       );
       paint.color = normalColor;
       canvas.drawRRect(
-        RRect.fromRectAndCorners(Rect.fromLTRB(lowX, 10, width, 18), topRight: radius, bottomRight: radius),
+        RRect.fromRectAndCorners(
+          Rect.fromLTRB(lowX, 10, width, 18),
+          topRight: radius,
+          bottomRight: radius,
+        ),
         paint,
       );
     } else if (refHigh != null) {
       // 2 zones (Normal, High)
       paint.color = normalColor;
       canvas.drawRRect(
-        RRect.fromRectAndCorners(Rect.fromLTRB(0, 10, highX, 18), topLeft: radius, bottomLeft: radius),
+        RRect.fromRectAndCorners(
+          Rect.fromLTRB(0, 10, highX, 18),
+          topLeft: radius,
+          bottomLeft: radius,
+        ),
         paint,
       );
       paint.color = highColor;
       canvas.drawRRect(
-        RRect.fromRectAndCorners(Rect.fromLTRB(highX, 10, width, 18), topRight: radius, bottomRight: radius),
+        RRect.fromRectAndCorners(
+          Rect.fromLTRB(highX, 10, width, 18),
+          topRight: radius,
+          bottomRight: radius,
+        ),
         paint,
       );
     }
@@ -152,7 +194,7 @@ class _GaugePainter extends CustomPainter {
       ..color = theme.colorScheme.onSurface.withValues(alpha: 0.5)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
-      
+
     if (refLow != null) {
       canvas.drawLine(Offset(lowX, 8), Offset(lowX, 20), limitTickPaint);
     }
@@ -162,7 +204,7 @@ class _GaugePainter extends CustomPainter {
 
     // Draw current value marker
     final valX = xPos(value).clamp(4.0, width - 4.0);
-    
+
     // Check if it's out of bounds and we clamped it heavily (unlikely due to displayMin/Max scaling, but safe)
     bool outOfBoundsRight = value > displayMax;
     bool outOfBoundsLeft = value < displayMin;
@@ -174,22 +216,34 @@ class _GaugePainter extends CustomPainter {
     // Triangle marker pointing down
     final path = Path();
     if (outOfBoundsRight) {
-       path..moveTo(width - 4, 0)..lineTo(width, 4)..lineTo(width - 4, 8)..close();
+      path
+        ..moveTo(width - 4, 0)
+        ..lineTo(width, 4)
+        ..lineTo(width - 4, 8)
+        ..close();
     } else if (outOfBoundsLeft) {
-       path..moveTo(4, 0)..lineTo(0, 4)..lineTo(4, 8)..close();
+      path
+        ..moveTo(4, 0)
+        ..lineTo(0, 4)
+        ..lineTo(4, 8)
+        ..close();
     } else {
-       path..moveTo(valX, 8)..lineTo(valX - 4, 2)..lineTo(valX + 4, 2)..close();
+      path
+        ..moveTo(valX, 8)
+        ..lineTo(valX - 4, 2)
+        ..lineTo(valX + 4, 2)
+        ..close();
     }
-    
+
     final tickPaint = Paint()
       ..color = theme.colorScheme.onSurface
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
     canvas.drawPath(path, markerPaint);
-    
+
     if (!outOfBoundsLeft && !outOfBoundsRight) {
-       canvas.drawLine(Offset(valX, 8), Offset(valX, 20), tickPaint);
+      canvas.drawLine(Offset(valX, 8), Offset(valX, 20), tickPaint);
     }
   }
 

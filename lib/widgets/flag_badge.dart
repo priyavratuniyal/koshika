@@ -10,7 +10,7 @@ class FlagBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     Color color;
     String text;
-    
+
     switch (flag) {
       case BiomarkerFlag.normal:
         color = Colors.green;

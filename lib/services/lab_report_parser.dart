@@ -22,48 +22,85 @@ class RawLabRow {
 class LabReportParser {
   /// Known section headers to group tests
   static const List<String> _sectionHeaders = [
-    'COMPLETE BLOOD COUNT', 'CBC', 'HAEMOGRAM',
-    'LIPID PROFILE', 'LIPID',
-    'THYROID PROFILE', 'THYROID',
-    'LIVER FUNCTION TEST', 'LIVER FUNCTION', 'LFT',
-    'KIDNEY FUNCTION TEST', 'KIDNEY FUNCTION', 'KFT', 'RENAL FUNCTION',
-    'IRON STUDIES', 'IRON PROFILE',
-    'DIABETES', 'SUGAR', 'BLOOD SUGAR',
+    'COMPLETE BLOOD COUNT',
+    'CBC',
+    'HAEMOGRAM',
+    'LIPID PROFILE',
+    'LIPID',
+    'THYROID PROFILE',
+    'THYROID',
+    'LIVER FUNCTION TEST',
+    'LIVER FUNCTION',
+    'LFT',
+    'KIDNEY FUNCTION TEST',
+    'KIDNEY FUNCTION',
+    'KFT',
+    'RENAL FUNCTION',
+    'IRON STUDIES',
+    'IRON PROFILE',
+    'DIABETES',
+    'SUGAR',
+    'BLOOD SUGAR',
     'VITAMIN',
-    'BIOCHEMISTRY', 'SPECIAL SEROLOGY',
+    'BIOCHEMISTRY',
+    'SPECIAL SEROLOGY',
   ];
 
   /// Keywords that indicate a line is a header/footer, not a data row
   static const List<String> _ignoredLineKeywords = [
-    'patient ', 'patient:', 'name ', 'name:', 'age ', 'age:', 'sex ', 'sex:', 'gender ', 'gender:', 'sample ', 'sample:',
-    'barcode', 'report id', 'report no', 'report date', 'reported on', 'reported at',
+    'patient ',
+    'patient:',
+    'name ',
+    'name:',
+    'age ',
+    'age:',
+    'sex ',
+    'sex:',
+    'gender ',
+    'gender:',
+    'sample ',
+    'sample:',
+    'barcode',
+    'report id',
+    'report no',
+    'report date',
+    'reported on',
+    'reported at',
     'date of', 'date:', 'collected', 'received',
     'doctor', 'ref by', 'referred', 'page ', 'page:', 'signature',
     'end of report', 'laboratory', 'test name', 'unit', 'reference',
     'biological reference interval', 'method',
-    '--- page',  // Page separator injected by PdfTextExtractorService
+    '--- page', // Page separator injected by PdfTextExtractorService
   ];
 
   /* 
    * Regex Patterns 
    */
-  
+
   // Pattern A: Space-delimited with clear columns:
   // "Hemoglobin    14.2    g/dL    13.0 - 17.0"
   // "WBC Count      8500    cells/cumm   4000-11000"
-  static final RegExp _patternA = RegExp(r'^([a-zA-Z0-9\s/().-]+?)\s{2,}([<>\d.,]+[\*HL]?)\s+([a-zA-Z/%µ]+)?\s*([<>\d.,]+ *[-–] *[\d.,]+|< *[\d.,]+|> *[\d.,]+|Upto\s*[\d.,]+)?$');
+  static final RegExp _patternA = RegExp(
+    r'^([a-zA-Z0-9\s/().-]+?)\s{2,}([<>\d.,]+[\*HL]?)\s+([a-zA-Z/%µ]+)?\s*([<>\d.,]+ *[-–] *[\d.,]+|< *[\d.,]+|> *[\d.,]+|Upto\s*[\d.,]+)?$',
+  );
 
   // Pattern B: Colon separated:
   // "Hemoglobin: 14.2 g/dL (13.0 - 17.0)"
-  static final RegExp _patternB = RegExp(r'^([a-zA-Z0-9\s/().-]+?):\s*([<>\d.,]+[\*HL]?)\s*([a-zA-Z/%µ]*)\s*(?:\(?([<>\d.,]+ *[-–] *[\d.,]+|< *[\d.,]+|> *[\d.,]+|Upto\s*[\d.,]+)?\)?)?$');
+  static final RegExp _patternB = RegExp(
+    r'^([a-zA-Z0-9\s/().-]+?):\s*([<>\d.,]+[\*HL]?)\s*([a-zA-Z/%µ]*)\s*(?:\(?([<>\d.,]+ *[-–] *[\d.,]+|< *[\d.,]+|> *[\d.,]+|Upto\s*[\d.,]+)?\)?)?$',
+  );
 
   // Pattern C: Pipe separated
   // "| Hemoglobin | 14.2 | g/dL | 13.0 - 17.0"
-  static final RegExp _patternC = RegExp(r'^\|?\s*([a-zA-Z0-9\s/().-]+?)\s*\|\s*([<>\d.,]+[\*HL]?)\s*\|\s*([a-zA-Z/%µ]*)\s*\|\s*([<>\d.,]+ *[-–] *[\d.,]+|< *[\d.,]+|> *[\d.,]+|Upto\s*[\d.,]+)?$');
+  static final RegExp _patternC = RegExp(
+    r'^\|?\s*([a-zA-Z0-9\s/().-]+?)\s*\|\s*([<>\d.,]+[\*HL]?)\s*\|\s*([a-zA-Z/%µ]*)\s*\|\s*([<>\d.,]+ *[-–] *[\d.,]+|< *[\d.,]+|> *[\d.,]+|Upto\s*[\d.,]+)?$',
+  );
 
   // Pattern D: Loose catch-all (name + value)
   // "Hemoglobin 14.2"
-  static final RegExp _patternD = RegExp(r'^([a-zA-Z][a-zA-Z\s/().-]{2,40}?)\s+([<>\d]+[.,]*\d*[\*HL]?)');
+  static final RegExp _patternD = RegExp(
+    r'^([a-zA-Z][a-zA-Z\s/().-]{2,40}?)\s+([<>\d]+[.,]*\d*[\*HL]?)',
+  );
 
   /// Try to parse raw text into structured rows
   List<RawLabRow> parseRawText(String fullText) {
@@ -112,22 +149,26 @@ class LabReportParser {
 
       // Handle multiline test names (e.g., test name split over two lines)
       if (row == null && i < lines.length - 1) {
-         // Check if the NEXT line has numbers
-         final nextLine = lines[i+1].trim();
-         if (nextLine.isNotEmpty && RegExp(r'\d').hasMatch(nextLine) && !RegExp(r'\d').hasMatch(line)) {
-            // This line is just text, next line has the data. Combine them.
-            final combinedLine = '$line $nextLine';
-            row = _tryPatterns(combinedLine, currentSection);
-            
-            if (row == null) {
-               final cleanCombinedLine = combinedLine.replaceAll(RegExp(r'\s+'), ' ').trim();
-               row = _tryPatterns(cleanCombinedLine, currentSection);
-            }
-            
-            if (row != null) {
-              i++; // Skip the next line since we consumed it
-            }
-         }
+        // Check if the NEXT line has numbers
+        final nextLine = lines[i + 1].trim();
+        if (nextLine.isNotEmpty &&
+            RegExp(r'\d').hasMatch(nextLine) &&
+            !RegExp(r'\d').hasMatch(line)) {
+          // This line is just text, next line has the data. Combine them.
+          final combinedLine = '$line $nextLine';
+          row = _tryPatterns(combinedLine, currentSection);
+
+          if (row == null) {
+            final cleanCombinedLine = combinedLine
+                .replaceAll(RegExp(r'\s+'), ' ')
+                .trim();
+            row = _tryPatterns(cleanCombinedLine, currentSection);
+          }
+
+          if (row != null) {
+            i++; // Skip the next line since we consumed it
+          }
+        }
       }
 
       if (row != null) {
@@ -178,24 +219,26 @@ class LabReportParser {
     // Try Pattern D (Loose Catch-all)
     match = _patternD.firstMatch(line);
     if (match != null) {
-       // Look ahead in the line to see if we missed units/range 
-       final remaining = line.substring(match.end).trim();
-       String? unit;
-       String? range;
+      // Look ahead in the line to see if we missed units/range
+      final remaining = line.substring(match.end).trim();
+      String? unit;
+      String? range;
 
-       // Very rudimentary check for unit or range in the remainder
-       if (remaining.isNotEmpty) {
-           final tokens = remaining.split(' ');
-           if (tokens.isNotEmpty && !tokens[0].contains(RegExp(r'\d'))) {
-              unit = tokens[0];
-           }
-           final rangeMatch = RegExp(r'([<>\d.,]+ *[-–] *[\d.,]+|< *[\d.,]+|> *[\d.,]+)').firstMatch(remaining);
-           if (rangeMatch != null) {
-               range = rangeMatch.group(1);
-           }
-       }
+      // Very rudimentary check for unit or range in the remainder
+      if (remaining.isNotEmpty) {
+        final tokens = remaining.split(' ');
+        if (tokens.isNotEmpty && !tokens[0].contains(RegExp(r'\d'))) {
+          unit = tokens[0];
+        }
+        final rangeMatch = RegExp(
+          r'([<>\d.,]+ *[-–] *[\d.,]+|< *[\d.,]+|> *[\d.,]+)',
+        ).firstMatch(remaining);
+        if (rangeMatch != null) {
+          range = rangeMatch.group(1);
+        }
+      }
 
-       return RawLabRow(
+      return RawLabRow(
         testName: match.group(1)!.trim(),
         valueStr: match.group(2)?.trim(),
         unit: unit,

@@ -28,9 +28,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<void> _exportAllFhir() async {
     final reports = objectbox.getAllReports();
     if (reports.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No data to export')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No data to export')));
       return;
     }
 
@@ -49,18 +49,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final file = File(p.join(tempDir.path, 'koshika_health_data_$timestamp.fhir.json'));
+      final file = File(
+        p.join(tempDir.path, 'koshika_health_data_$timestamp.fhir.json'),
+      );
       await file.writeAsString(jsonStr);
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'My Koshika Health Data (FHIR R4)',
-      );
+      await Share.shareXFiles([
+        XFile(file.path),
+      ], text: 'My Koshika Health Data (FHIR R4)');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
       }
     }
   }
@@ -101,7 +102,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       final File sourceFile = File(sourcePath);
       final Directory appDocsDir = await getApplicationDocumentsDirectory();
-      final String destFileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(sourcePath)}';
+      final String destFileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${p.basename(sourcePath)}';
       final String destPath = p.join(appDocsDir.path, destFileName);
       destFile = File(destPath);
 
@@ -109,7 +111,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       final extractor = PdfTextExtractorService();
       final parser = LabReportParser();
-      final service = PdfImportService(extractor, parser, biomarkerDictionary, objectbox);
+      final service = PdfImportService(
+        extractor,
+        parser,
+        biomarkerDictionary,
+        objectbox,
+      );
 
       final importResult = await service.importPdf(destPath);
 
@@ -125,14 +132,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       if (importResult.success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Imported ${importResult.successfulMatches} biomarkers')),
+          SnackBar(
+            content: Text(
+              'Imported ${importResult.successfulMatches} biomarkers',
+            ),
+          ),
         );
 
         if (importResult.report != null) {
           Navigator.of(context)
               .push(
                 MaterialPageRoute(
-                  builder: (context) => ReportDetailScreen(reportId: importResult.report!.id),
+                  builder: (context) =>
+                      ReportDetailScreen(reportId: importResult.report!.id),
                 ),
               )
               .then((_) => setState(() {}));
@@ -167,9 +179,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       });
       if (mounted) {
         if (Navigator.canPop(context)) Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -223,7 +235,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     Text(
                       'Tap the button below to import your first lab report PDF.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -260,7 +274,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               ),
                               TextButton(
                                 onPressed: () => Navigator.of(ctx).pop(true),
-                                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                child: const Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.red),
+                                ),
                               ),
                             ],
                           ),
@@ -283,7 +300,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         Navigator.of(context)
                             .push(
                               MaterialPageRoute(
-                                builder: (context) => ReportDetailScreen(reportId: report.id),
+                                builder: (context) =>
+                                    ReportDetailScreen(reportId: report.id),
                               ),
                             )
                             .then((_) => setState(() {}));
@@ -295,7 +313,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           color: theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
-                      title: Text(report.labName ?? report.originalFileName ?? 'Lab Report'),
+                      title: Text(
+                        report.labName ??
+                            report.originalFileName ??
+                            'Lab Report',
+                      ),
                       subtitle: Text(
                         '${report.reportDate.day}/${report.reportDate.month}/${report.reportDate.year}'
                         ' • ${report.extractedCount} biomarkers',

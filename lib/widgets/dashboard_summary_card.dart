@@ -70,11 +70,21 @@ class DashboardSummaryCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (normalCount > 0) _buildStatChip(context, 'Normal', normalCount, Colors.green),
-                if (lowCount > 0) _buildStatChip(context, 'Low', lowCount, Colors.orange),
-                if (highCount > 0) _buildStatChip(context, 'High', highCount, Colors.red),
-                if (criticalCount > 0) _buildStatChip(context, 'Critical', criticalCount, Colors.red[900]!),
-                if (unknownCount > 0) _buildStatChip(context, 'Unknown', unknownCount, Colors.grey),
+                if (normalCount > 0)
+                  _buildStatChip(context, 'Normal', normalCount, Colors.green),
+                if (lowCount > 0)
+                  _buildStatChip(context, 'Low', lowCount, Colors.orange),
+                if (highCount > 0)
+                  _buildStatChip(context, 'High', highCount, Colors.red),
+                if (criticalCount > 0)
+                  _buildStatChip(
+                    context,
+                    'Critical',
+                    criticalCount,
+                    Colors.red[900]!,
+                  ),
+                if (unknownCount > 0)
+                  _buildStatChip(context, 'Unknown', unknownCount, Colors.grey),
               ],
             ),
             if (lastReport != null) ...[
@@ -83,7 +93,11 @@ class DashboardSummaryCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.update, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                  Icon(
+                    Icons.update,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
@@ -104,7 +118,12 @@ class DashboardSummaryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatChip(BuildContext context, String label, int count, Color color) {
+  Widget _buildStatChip(
+    BuildContext context,
+    String label,
+    int count,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -117,19 +136,10 @@ class DashboardSummaryCard extends StatelessWidget {
         children: [
           Text(
             '$count',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, color: color),
           ),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 12, color: color)),
         ],
       ),
     );

@@ -34,7 +34,12 @@ class PdfImportService {
   final BiomarkerDictionary _dictionary;
   final ObjectBoxStore _store;
 
-  PdfImportService(this._extractor, this._parser, this._dictionary, this._store);
+  PdfImportService(
+    this._extractor,
+    this._parser,
+    this._dictionary,
+    this._store,
+  );
 
   static double? parseNumericValue(String? rawValue) {
     if (rawValue == null) return null;
@@ -42,8 +47,9 @@ class PdfImportService {
     final trimmed = rawValue.trim();
     if (trimmed.isEmpty) return null;
 
-    final match = RegExp(r'[-+]?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?|[-+]?\d+(?:,\d+)?(?:[eE][-+]?\d+)?')
-        .firstMatch(trimmed);
+    final match = RegExp(
+      r'[-+]?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?|[-+]?\d+(?:,\d+)?(?:[eE][-+]?\d+)?',
+    ).firstMatch(trimmed);
     if (match == null) return null;
 
     var numeric = match.group(0)!;
@@ -59,7 +65,9 @@ class PdfImportService {
       final parts = numeric.split(',');
       if (commaCount > 1) {
         numeric = numeric.replaceAll(',', '');
-      } else if (parts.length == 2 && parts[1].length == 3 && parts[0].length > 1) {
+      } else if (parts.length == 2 &&
+          parts[1].length == 3 &&
+          parts[0].length > 1) {
         numeric = numeric.replaceAll(',', '');
       } else {
         numeric = numeric.replaceAll(',', '.');
@@ -75,10 +83,13 @@ class PdfImportService {
     }
 
     final trimmedRange = rawRange.trim();
-    final rangeStr = trimmedRange.replaceAll(RegExp(r'[a-z/%µ]+', caseSensitive: false), '').trim();
+    final rangeStr = trimmedRange
+        .replaceAll(RegExp(r'[a-z/%µ]+', caseSensitive: false), '')
+        .trim();
 
-    final betweenMatch = RegExp(r'([-+]?\d[\d,]*(?:\.\d+)?)\s*[-–]\s*([-+]?\d[\d,]*(?:\.\d+)?)')
-        .firstMatch(rangeStr);
+    final betweenMatch = RegExp(
+      r'([-+]?\d[\d,]*(?:\.\d+)?)\s*[-–]\s*([-+]?\d[\d,]*(?:\.\d+)?)',
+    ).firstMatch(rangeStr);
     if (betweenMatch != null) {
       return (
         low: parseNumericValue(betweenMatch.group(1)),
@@ -94,7 +105,9 @@ class PdfImportService {
       return (low: null, high: parseNumericValue(lessMatch.group(1)));
     }
 
-    final moreMatch = RegExp(r'>\s*([-+]?\d[\d,]*(?:\.\d+)?)').firstMatch(trimmedRange);
+    final moreMatch = RegExp(
+      r'>\s*([-+]?\d[\d,]*(?:\.\d+)?)',
+    ).firstMatch(trimmedRange);
     if (moreMatch != null) {
       return (low: parseNumericValue(moreMatch.group(1)), high: null);
     }
@@ -105,45 +118,54 @@ class PdfImportService {
   Future<ImportResult> importPdf(String filePath) async {
     final List<String> warnings = [];
     final List<String> unmatchedTests = [];
-    
+
     try {
       // 1. Extract text
-      final PdfExtractionResult extractResult = await _extractor.extractText(filePath);
-      
+      final PdfExtractionResult extractResult = await _extractor.extractText(
+        filePath,
+      );
+
       if (extractResult.isEmpty) {
         return ImportResult(
-          success: false, 
-          errorMessage: 'This PDF appears to be a scanned image or empty. Text extraction from images is not yet supported.',
+          success: false,
+          errorMessage:
+              'This PDF appears to be a scanned image or empty. Text extraction from images is not yet supported.',
         );
       }
 
       // 2. Parse raw text into candidate rows
-      final List<RawLabRow> candidateRows = _parser.parseRawText(extractResult.fullText);
+      final List<RawLabRow> candidateRows = _parser.parseRawText(
+        extractResult.fullText,
+      );
       final int totalRows = candidateRows.length;
 
       if (totalRows == 0) {
-        warnings.add('No biomarker data was found in this PDF. It may not be a lab report, or the format is not recognized.');
+        warnings.add(
+          'No biomarker data was found in this PDF. It may not be a lab report, or the format is not recognized.',
+        );
       }
 
       // 3. Match candidate rows to the dictionary and build BiomarkerResults
-      final Map<String, BiomarkerResult> bestMatches = {}; // Use Map for de-duplication
+      final Map<String, BiomarkerResult> bestMatches =
+          {}; // Use Map for de-duplication
 
       for (final row in candidateRows) {
         final BiomarkerMatch? match = _dictionary.fuzzyMatch(row.testName);
 
         if (match != null) {
           final def = match.definition;
-          
+
           // De-duplication: if we already matched this biomarker key,
           // only override if the new row has a value and the existing one doesn't.
           if (bestMatches.containsKey(def.key)) {
-             final existing = bestMatches[def.key]!;
-             final bool existingHasNoValue = existing.value == null;
-             final bool newRowHasValue = row.valueStr != null && row.valueStr!.trim().isNotEmpty;
-             if (!(existingHasNoValue && newRowHasValue)) {
-                continue; // Keep existing, skip this duplicate
-             }
-             // Otherwise fall through to override with the better row
+            final existing = bestMatches[def.key]!;
+            final bool existingHasNoValue = existing.value == null;
+            final bool newRowHasValue =
+                row.valueStr != null && row.valueStr!.trim().isNotEmpty;
+            if (!(existingHasNoValue && newRowHasValue)) {
+              continue; // Keep existing, skip this duplicate
+            }
+            // Otherwise fall through to override with the better row
           }
 
           // Parse value
@@ -154,16 +176,17 @@ class PdfImportService {
           }
 
           // Parse reference range
-          double? refLow = def.refLowMale;  // Default to male if patient has no sex defined
+          double? refLow =
+              def.refLowMale; // Default to male if patient has no sex defined
           double? refHigh = def.refHighMale;
-          
+
           // Try to extract from the PDF string, if not fallback to dictionary
           if (row.refRangeStr != null) {
-             final parsedRange = parseReferenceRange(row.refRangeStr);
-             if (parsedRange.low != null || parsedRange.high != null) {
-               refLow = parsedRange.low;
-               refHigh = parsedRange.high;
-             }
+            final parsedRange = parseReferenceRange(row.refRangeStr);
+            if (parsedRange.low != null || parsedRange.high != null) {
+              refLow = parsedRange.low;
+              refHigh = parsedRange.high;
+            }
           }
 
           final result = BiomarkerResult(
@@ -180,7 +203,7 @@ class PdfImportService {
             category: def.category,
             testDate: extractResult.reportDate ?? DateTime.now(),
           );
-          
+
           result.computeFlag();
           bestMatches[def.key] = result;
         } else {
@@ -194,7 +217,7 @@ class PdfImportService {
 
       // Create Report object
       final String originalFileName = p.basename(filePath);
-      
+
       final LabReport report = LabReport(
         labName: extractResult.labName,
         reportDate: extractResult.reportDate ?? DateTime.now(),
@@ -225,7 +248,6 @@ class PdfImportService {
         unmatchedTests: unmatchedTests,
         warnings: warnings,
       );
-
     } catch (e) {
       return ImportResult(
         success: false,

@@ -87,10 +87,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     outOfRangeResults.sort((a, b) {
-      if (a.flag == BiomarkerFlag.critical && b.flag != BiomarkerFlag.critical) {
+      if (a.flag == BiomarkerFlag.critical &&
+          b.flag != BiomarkerFlag.critical) {
         return -1;
       }
-      if (b.flag == BiomarkerFlag.critical && a.flag != BiomarkerFlag.critical) {
+      if (b.flag == BiomarkerFlag.critical &&
+          a.flag != BiomarkerFlag.critical) {
         return 1;
       }
       return 0;
@@ -100,9 +102,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final lastReport = reports.isNotEmpty ? reports.first : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Koshika'),
-      ),
+      appBar: AppBar(title: const Text('Koshika')),
       body: latestResults.isEmpty
           ? Center(
               child: Padding(
@@ -124,7 +124,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(
                       'Import a lab report PDF from the Reports tab to get started.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -147,7 +149,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 if (outOfRangeResults.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Card(
-                    color: theme.colorScheme.errorContainer.withValues(alpha: 0.3),
+                    color: theme.colorScheme.errorContainer.withValues(
+                      alpha: 0.3,
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -155,7 +159,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error),
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: theme.colorScheme.error,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Attention Needed',
@@ -184,7 +191,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               contentPadding: EdgeInsets.zero,
                               title: Text(
                                 r.displayName,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -193,7 +202,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   const SizedBox(width: 8),
                                   FlagBadge(flag: r.flag),
                                   const SizedBox(width: 4),
-                                  const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+                                  const Icon(
+                                    Icons.chevron_right,
+                                    size: 16,
+                                    color: Colors.grey,
+                                  ),
                                 ],
                               ),
                             ),
@@ -205,7 +218,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
                 const SizedBox(height: 16),
                 ...categories.map((cat) {
-                  final catResults = latestResults.values.where((r) => r.category == cat).toList();
+                  final catResults = latestResults.values
+                      .where((r) => r.category == cat)
+                      .toList();
                   if (catResults.isEmpty) {
                     return const SizedBox.shrink();
                   }
@@ -226,18 +241,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const Divider(),
                             ...catResults.map((r) {
-                              final trend = trendMap[r.biomarkerKey] ??
-                                  (color: Colors.grey, icon: Icons.arrow_forward);
+                              final trend =
+                                  trendMap[r.biomarkerKey] ??
+                                  (
+                                    color: Colors.grey,
+                                    icon: Icons.arrow_forward,
+                                  );
                               Color bgColor = Colors.transparent;
                               switch (r.flag) {
                                 case BiomarkerFlag.low:
-                                  bgColor = Colors.orange.withValues(alpha: 0.05);
+                                  bgColor = Colors.orange.withValues(
+                                    alpha: 0.05,
+                                  );
                                 case BiomarkerFlag.high:
                                   bgColor = Colors.red.withValues(alpha: 0.05);
                                 case BiomarkerFlag.critical:
                                   bgColor = Colors.red.withValues(alpha: 0.1);
                                 case BiomarkerFlag.normal:
-                                  bgColor = Colors.green.withValues(alpha: 0.05);
+                                  bgColor = Colors.green.withValues(
+                                    alpha: 0.05,
+                                  );
                                 case BiomarkerFlag.unknown:
                                   break;
                               }
@@ -256,22 +279,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 },
                                 child: Container(
                                   color: bgColor,
-                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 8,
+                                  ),
                                   child: Row(
                                     children: [
-                                      Expanded(
-                                        child: Text(r.displayName),
-                                      ),
+                                      Expanded(child: Text(r.displayName)),
                                       Text(
                                         '${r.formattedValue} ${r.unit ?? ""}',
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                       const SizedBox(width: 8),
                                       FlagBadge(flag: r.flag),
                                       const SizedBox(width: 8),
-                                      Icon(trend.icon, color: trend.color, size: 16),
+                                      Icon(
+                                        trend.icon,
+                                        color: trend.color,
+                                        size: 16,
+                                      ),
                                       const SizedBox(width: 4),
-                                      const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+                                      const Icon(
+                                        Icons.chevron_right,
+                                        size: 16,
+                                        color: Colors.grey,
+                                      ),
                                     ],
                                   ),
                                 ),

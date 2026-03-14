@@ -14,9 +14,7 @@ class BiomarkerTrendChart extends StatelessWidget {
     final theme = Theme.of(context);
 
     // 1. Filter numeric results and sort by date ascending
-    final numericResults = history
-        .where((r) => r.value != null)
-        .toList()
+    final numericResults = history.where((r) => r.value != null).toList()
       ..sort((a, b) => a.testDate.compareTo(b.testDate));
 
     if (numericResults.isEmpty) {
@@ -87,12 +85,9 @@ class BiomarkerTrendChart extends StatelessWidget {
       // Shade from refLow to refHigh
       final shadeTop = refHigh ?? maxY;
       final shadeBottom = refLow ?? 0.0;
-      
+
       extraLines.add(
-        HorizontalLine(
-          y: shadeTop,
-          color: Colors.green.withValues(alpha: 0.3),
-        ),
+        HorizontalLine(y: shadeTop, color: Colors.green.withValues(alpha: 0.3)),
       );
       if (refLow != null) {
         extraLines.add(
@@ -102,11 +97,10 @@ class BiomarkerTrendChart extends StatelessWidget {
           ),
         );
       }
-      
-      
+
       // fl_chart doesn't support shaded regions between ExtraLinesData lines directly,
       // so we use BetweenBarsData with hidden lines to create the reference band.
-      
+
       highLine = LineChartBarData(
         spots: [FlSpot(minX, shadeTop), FlSpot(maxX, shadeTop)],
         show: false,
@@ -131,8 +125,8 @@ class BiomarkerTrendChart extends StatelessWidget {
         getDotPainter: (spot, percent, barData, index) {
           final result = numericResults[index];
           Color dotColor = Colors.green;
-          if (result.flag == BiomarkerFlag.high || 
-              result.flag == BiomarkerFlag.low || 
+          if (result.flag == BiomarkerFlag.high ||
+              result.flag == BiomarkerFlag.low ||
               result.flag == BiomarkerFlag.critical) {
             dotColor = Colors.red;
           }
@@ -165,23 +159,29 @@ class BiomarkerTrendChart extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.only(right: 18, left: 12, top: 24, bottom: 12),
+        padding: const EdgeInsets.only(
+          right: 18,
+          left: 12,
+          top: 24,
+          bottom: 12,
+        ),
         child: SizedBox(
           height: 250,
           child: LineChart(
-             LineChartData(
+            LineChartData(
               minX: minX,
               maxX: maxX,
               minY: minY,
               maxY: maxY,
-              gridData: const FlGridData(
-                show: true,
-                drawVerticalLine: false,
-              ),
+              gridData: const FlGridData(show: true, drawVerticalLine: false),
               titlesData: FlTitlesData(
                 show: true,
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -191,12 +191,16 @@ class BiomarkerTrendChart extends StatelessWidget {
                       if (value == maxX || value == minX) {
                         return const SizedBox.shrink(); // avoid edge cut-offs or handle with padding
                       }
-                      final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
+                      final date = DateTime.fromMillisecondsSinceEpoch(
+                        value.toInt(),
+                      );
                       return Padding(
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
                           DateFormat('MMM d').format(date),
-                          style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 10,
+                          ),
                         ),
                       );
                     },
@@ -209,7 +213,8 @@ class BiomarkerTrendChart extends StatelessWidget {
                     getTitlesWidget: (value, meta) {
                       String formattedValue;
                       if (value.abs() >= 10000) {
-                        formattedValue = '${(value / 1000).toStringAsFixed(0)}k';
+                        formattedValue =
+                            '${(value / 1000).toStringAsFixed(0)}k';
                       } else if (value.abs() >= 100) {
                         formattedValue = value.toStringAsFixed(0);
                       } else if (value.abs() >= 1) {
@@ -219,7 +224,9 @@ class BiomarkerTrendChart extends StatelessWidget {
                       }
                       return Text(
                         formattedValue,
-                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 10,
+                        ),
                       );
                     },
                   ),
@@ -231,7 +238,8 @@ class BiomarkerTrendChart extends StatelessWidget {
               extraLinesData: ExtraLinesData(horizontalLines: extraLines),
               lineTouchData: LineTouchData(
                 touchTooltipData: LineTouchTooltipData(
-                  getTooltipColor: (_) => theme.colorScheme.surfaceContainerHighest,
+                  getTooltipColor: (_) =>
+                      theme.colorScheme.surfaceContainerHighest,
                   getTooltipItems: (touchedSpots) {
                     return touchedSpots.map((spot) {
                       // Filter out touches on the reference band lines
@@ -239,7 +247,9 @@ class BiomarkerTrendChart extends StatelessWidget {
                         return null;
                       }
                       final result = numericResults[spot.spotIndex];
-                      final dateStr = DateFormat('dd MMM yyyy').format(result.testDate);
+                      final dateStr = DateFormat(
+                        'dd MMM yyyy',
+                      ).format(result.testDate);
                       final flagStr = _getFlagCode(result.flag);
                       return LineTooltipItem(
                         '$dateStr\n',
@@ -250,7 +260,8 @@ class BiomarkerTrendChart extends StatelessWidget {
                         ),
                         children: [
                           TextSpan(
-                            text: '${result.formattedValue} ${result.unit ?? ""}',
+                            text:
+                                '${result.formattedValue} ${result.unit ?? ""}',
                             style: TextStyle(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.bold,
@@ -260,7 +271,9 @@ class BiomarkerTrendChart extends StatelessWidget {
                           TextSpan(
                             text: ' ($flagStr)',
                             style: TextStyle(
-                              color: result.flag == BiomarkerFlag.normal ? Colors.green : Colors.red,
+                              color: result.flag == BiomarkerFlag.normal
+                                  ? Colors.green
+                                  : Colors.red,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -279,11 +292,16 @@ class BiomarkerTrendChart extends StatelessWidget {
 
   String _getFlagCode(BiomarkerFlag flag) {
     switch (flag) {
-      case BiomarkerFlag.normal: return 'N';
-      case BiomarkerFlag.low: return 'L';
-      case BiomarkerFlag.high: return 'H';
-      case BiomarkerFlag.critical: return 'C';
-      case BiomarkerFlag.unknown: return '-';
+      case BiomarkerFlag.normal:
+        return 'N';
+      case BiomarkerFlag.low:
+        return 'L';
+      case BiomarkerFlag.high:
+        return 'H';
+      case BiomarkerFlag.critical:
+        return 'C';
+      case BiomarkerFlag.unknown:
+        return '-';
     }
   }
 }

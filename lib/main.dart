@@ -65,9 +65,7 @@ class KoshikaApp extends StatelessWidget {
       ),
       cardTheme: CardThemeData(
         elevation: isDark ? 1 : 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,

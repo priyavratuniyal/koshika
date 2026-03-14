@@ -17,10 +17,7 @@ class FhirExportService {
     final patientResource = _buildPatientResource(patient, patientId);
 
     final entries = <Map<String, dynamic>>[
-      {
-        'fullUrl': 'urn:uuid:$patientId',
-        'resource': patientResource,
-      }
+      {'fullUrl': 'urn:uuid:$patientId', 'resource': patientResource},
     ];
 
     for (final report in reports) {
@@ -37,10 +34,7 @@ class FhirExportService {
           obsId: obsId,
           patientId: patientId,
         );
-        entries.add({
-          'fullUrl': 'urn:uuid:$obsId',
-          'resource': obsResource,
-        });
+        entries.add({'fullUrl': 'urn:uuid:$obsId', 'resource': obsResource});
         obsRefs.add({'reference': 'Observation/$obsId'});
       }
 
@@ -85,15 +79,15 @@ class FhirExportService {
       'resourceType': 'Patient',
       'id': id,
       'name': [
-        {
-          'text': patient.name,
-        }
+        {'text': patient.name},
       ],
       'gender': _mapGender(patient.sex),
     };
 
     if (patient.dateOfBirth != null) {
-      resource['birthDate'] = DateFormat('yyyy-MM-dd').format(patient.dateOfBirth!);
+      resource['birthDate'] = DateFormat(
+        'yyyy-MM-dd',
+      ).format(patient.dateOfBirth!);
     }
 
     return resource;
@@ -125,16 +119,15 @@ class FhirExportService {
         {
           'coding': [
             {
-              'system': 'http://terminology.hl7.org/CodeSystem/observation-category',
+              'system':
+                  'http://terminology.hl7.org/CodeSystem/observation-category',
               'code': 'laboratory',
-              'display': 'Laboratory'
-            }
-          ]
-        }
+              'display': 'Laboratory',
+            },
+          ],
+        },
       ],
-      'subject': {
-        'reference': 'Patient/$patientId',
-      },
+      'subject': {'reference': 'Patient/$patientId'},
       'effectiveDateTime': DateFormat('yyyy-MM-dd').format(result.testDate),
     };
 
@@ -146,29 +139,25 @@ class FhirExportService {
             'system': 'http://loinc.org',
             'code': result.loincCode,
             'display': result.displayName,
-          }
+          },
         ],
         'text': result.displayName,
       };
     } else {
-      resource['code'] = {
-        'text': result.displayName,
-      };
+      resource['code'] = {'text': result.displayName};
     }
 
     // Value
     if (result.value != null) {
-      final valueQuantity = <String, dynamic>{
-        'value': result.value,
-      };
-      
+      final valueQuantity = <String, dynamic>{'value': result.value};
+
       if (result.unit != null && result.unit!.isNotEmpty) {
         valueQuantity['unit'] = result.unit;
         // Basic mapping to UCUM (not exhaustive but covers common ones)
         valueQuantity['system'] = 'http://unitsofmeasure.org';
         valueQuantity['code'] = _mapToUcum(result.unit!);
       }
-      
+
       resource['valueQuantity'] = valueQuantity;
     } else if (result.valueText != null && result.valueText!.isNotEmpty) {
       resource['valueString'] = result.valueText;
@@ -177,17 +166,17 @@ class FhirExportService {
     // Reference Range
     if (result.refLow != null || result.refHigh != null) {
       final refRange = <String, dynamic>{};
-      
+
       if (result.refLow != null) {
         refRange['low'] = {'value': result.refLow};
         if (result.unit != null) refRange['low']['unit'] = result.unit;
       }
-      
+
       if (result.refHigh != null) {
         refRange['high'] = {'value': result.refHigh};
         if (result.unit != null) refRange['high']['unit'] = result.unit;
       }
-      
+
       resource['referenceRange'] = [refRange];
     }
 
@@ -198,12 +187,13 @@ class FhirExportService {
         {
           'coding': [
             {
-              'system': 'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
+              'system':
+                  'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
               'code': interpretationStr['code'],
               'display': interpretationStr['display'],
-            }
-          ]
-        }
+            },
+          ],
+        },
       ];
     }
 
@@ -226,17 +216,15 @@ class FhirExportService {
             {
               'system': 'http://terminology.hl7.org/CodeSystem/v2-0074',
               'code': 'LAB',
-              'display': 'Laboratory'
-            }
-          ]
-        }
+              'display': 'Laboratory',
+            },
+          ],
+        },
       ],
       'code': {
         'text': '${report.labName ?? report.originalFileName ?? "Lab"} Report',
       },
-      'subject': {
-        'reference': 'Patient/$patientId',
-      },
+      'subject': {'reference': 'Patient/$patientId'},
       'effectiveDateTime': DateFormat('yyyy-MM-dd').format(report.reportDate),
       'result': observationReferences,
     };
@@ -260,24 +248,47 @@ class FhirExportService {
   String _mapToUcum(String unit) {
     // Map common Indian lab units to UCUM codes
     switch (unit.toLowerCase()) {
-      case 'mg/dl': return 'mg/dL';
-      case 'g/dl': return 'g/dL';
-      case 'miu/l': return 'm[IU]/L';
-      case 'µiu/ml': case 'uiu/ml': return 'u[IU]/mL';
-      case 'ng/ml': return 'ng/mL';
-      case 'pg/ml': return 'pg/mL';
-      case 'cells/cumm': case 'cells/ul': return '/uL';
-      case 'million/cumm': case 'million/ul': return '10*6/uL';
-      case '%': return '%';
-      case 'mm/hr': case 'mm/h': return 'mm/h';
-      case 'iu/l': return '[IU]/L';
-      case 'u/l': return 'U/L';
-      case 'mmol/l': return 'mmol/L';
-      case 'meq/l': return 'meq/L';
-      case 'µg/dl': case 'ug/dl': return 'ug/dL';
-      case 'fl': return 'fL';
-      case 'pg': return 'pg';
-      default: return unit; // Pass through unknown as-is
+      case 'mg/dl':
+        return 'mg/dL';
+      case 'g/dl':
+        return 'g/dL';
+      case 'miu/l':
+        return 'm[IU]/L';
+      case 'µiu/ml':
+      case 'uiu/ml':
+        return 'u[IU]/mL';
+      case 'ng/ml':
+        return 'ng/mL';
+      case 'pg/ml':
+        return 'pg/mL';
+      case 'cells/cumm':
+      case 'cells/ul':
+        return '/uL';
+      case 'million/cumm':
+      case 'million/ul':
+        return '10*6/uL';
+      case '%':
+        return '%';
+      case 'mm/hr':
+      case 'mm/h':
+        return 'mm/h';
+      case 'iu/l':
+        return '[IU]/L';
+      case 'u/l':
+        return 'U/L';
+      case 'mmol/l':
+        return 'mmol/L';
+      case 'meq/l':
+        return 'meq/L';
+      case 'µg/dl':
+      case 'ug/dl':
+        return 'ug/dL';
+      case 'fl':
+        return 'fL';
+      case 'pg':
+        return 'pg';
+      default:
+        return unit; // Pass through unknown as-is
     }
   }
 }
