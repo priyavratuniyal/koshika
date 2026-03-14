@@ -43,7 +43,10 @@ class ObjectBoxStore {
   List<LabReport> getAllReports() {
     final query = labReportBox.query()
       ..order(LabReport_.reportDate, flags: Order.descending);
-    return query.build().find();
+    final built = query.build();
+    final results = built.find();
+    built.close();
+    return results;
   }
 
   /// Get all biomarker results for a specific report
@@ -51,7 +54,9 @@ class ObjectBoxStore {
     final query = biomarkerResultBox.query(
       BiomarkerResult_.report.equals(reportId),
     ).build();
-    return query.find();
+    final results = query.find();
+    query.close();
+    return results;
   }
 
   /// Get all historical values for a specific biomarker key, ordered by date
@@ -59,14 +64,19 @@ class ObjectBoxStore {
     final query = biomarkerResultBox.query(
       BiomarkerResult_.biomarkerKey.equals(biomarkerKey),
     )..order(BiomarkerResult_.testDate, flags: Order.descending);
-    return query.build().find();
+    final built = query.build();
+    final results = built.find();
+    built.close();
+    return results;
   }
 
   /// Get the latest result for each unique biomarker key
   Map<String, BiomarkerResult> getLatestResults() {
     final all = biomarkerResultBox.query()
       ..order(BiomarkerResult_.testDate, flags: Order.descending);
-    final results = all.build().find();
+    final built = all.build();
+    final results = built.find();
+    built.close();
 
     final latest = <String, BiomarkerResult>{};
     for (final result in results) {
@@ -81,7 +91,9 @@ class ObjectBoxStore {
   int getOutOfRangeCount() {
     final latest = getLatestResults();
     return latest.values.where((r) =>
-      r.flag == BiomarkerFlag.high || r.flag == BiomarkerFlag.low
+      r.flag == BiomarkerFlag.high ||
+      r.flag == BiomarkerFlag.low ||
+      r.flag == BiomarkerFlag.critical
     ).length;
   }
 
@@ -95,6 +107,22 @@ class ObjectBoxStore {
       }
       report.extractedCount = results.length;
       labReportBox.put(report);
+    });
+  }
+
+  /// Delete a report and all its associated biomarker results
+  void deleteReport(int reportId) {
+    store.runInTransaction(TxMode.write, () {
+      final query = biomarkerResultBox.query(
+        BiomarkerResult_.report.equals(reportId),
+      ).build();
+      final results = query.find();
+      query.close();
+
+      for (final r in results) {
+        biomarkerResultBox.remove(r.id);
+      }
+      labReportBox.remove(reportId);
     });
   }
 
