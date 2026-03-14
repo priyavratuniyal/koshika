@@ -36,6 +36,72 @@ class PdfImportService {
 
   PdfImportService(this._extractor, this._parser, this._dictionary, this._store);
 
+  static double? parseNumericValue(String? rawValue) {
+    if (rawValue == null) return null;
+
+    final trimmed = rawValue.trim();
+    if (trimmed.isEmpty) return null;
+
+    final match = RegExp(r'[-+]?\d[\d,]*(?:\.\d+)?(?:[eE][-+]?\d+)?|[-+]?\d+(?:,\d+)?(?:[eE][-+]?\d+)?')
+        .firstMatch(trimmed);
+    if (match == null) return null;
+
+    var numeric = match.group(0)!;
+
+    if (numeric.contains(',') && numeric.contains('.')) {
+      if (numeric.lastIndexOf(',') > numeric.lastIndexOf('.')) {
+        numeric = numeric.replaceAll('.', '').replaceAll(',', '.');
+      } else {
+        numeric = numeric.replaceAll(',', '');
+      }
+    } else if (numeric.contains(',')) {
+      final commaCount = ','.allMatches(numeric).length;
+      final parts = numeric.split(',');
+      if (commaCount > 1) {
+        numeric = numeric.replaceAll(',', '');
+      } else if (parts.length == 2 && parts[1].length == 3 && parts[0].length > 1) {
+        numeric = numeric.replaceAll(',', '');
+      } else {
+        numeric = numeric.replaceAll(',', '.');
+      }
+    }
+
+    return double.tryParse(numeric);
+  }
+
+  static ({double? low, double? high}) parseReferenceRange(String? rawRange) {
+    if (rawRange == null || rawRange.trim().isEmpty) {
+      return (low: null, high: null);
+    }
+
+    final trimmedRange = rawRange.trim();
+    final rangeStr = trimmedRange.replaceAll(RegExp(r'[a-z/%µ]+', caseSensitive: false), '').trim();
+
+    final betweenMatch = RegExp(r'([-+]?\d[\d,]*(?:\.\d+)?)\s*[-–]\s*([-+]?\d[\d,]*(?:\.\d+)?)')
+        .firstMatch(rangeStr);
+    if (betweenMatch != null) {
+      return (
+        low: parseNumericValue(betweenMatch.group(1)),
+        high: parseNumericValue(betweenMatch.group(2)),
+      );
+    }
+
+    final lessMatch = RegExp(
+      r'(?:<|upto|up to)\s*([-+]?\d[\d,]*(?:\.\d+)?)',
+      caseSensitive: false,
+    ).firstMatch(trimmedRange);
+    if (lessMatch != null) {
+      return (low: null, high: parseNumericValue(lessMatch.group(1)));
+    }
+
+    final moreMatch = RegExp(r'>\s*([-+]?\d[\d,]*(?:\.\d+)?)').firstMatch(trimmedRange);
+    if (moreMatch != null) {
+      return (low: parseNumericValue(moreMatch.group(1)), high: null);
+    }
+
+    return (low: null, high: null);
+  }
+
   Future<ImportResult> importPdf(String filePath) async {
     final List<String> warnings = [];
     final List<String> unmatchedTests = [];
@@ -81,8 +147,7 @@ class PdfImportService {
           }
 
           // Parse value
-          String cleanValueStr = row.valueStr?.replaceAll(RegExp(r'[^0-9.]'), '') ?? '';
-          double? parsedValue = double.tryParse(cleanValueStr);
+          final parsedValue = parseNumericValue(row.valueStr);
           String? valueText;
           if (parsedValue == null) {
             valueText = row.valueStr;
@@ -94,26 +159,10 @@ class PdfImportService {
           
           // Try to extract from the PDF string, if not fallback to dictionary
           if (row.refRangeStr != null) {
-             final rangeStr = row.refRangeStr!.replaceAll(RegExp(r'[a-zA-Z/%µ]+'), '').trim();
-             // Match format: 13.0 - 17.0
-             final match = RegExp(r'([\d.]+)\s*[-–]\s*([\d.]+)').firstMatch(rangeStr);
-             if (match != null) {
-                refLow = double.tryParse(match.group(1)!);
-                refHigh = double.tryParse(match.group(2)!);
-             } else {
-                // Formatting like "< 200"
-                final lessMatch = RegExp(r'<\s*([\d.]+)').firstMatch(rangeStr);
-                if (lessMatch != null) {
-                    refLow = null;
-                    refHigh = double.tryParse(lessMatch.group(1)!);
-                } else {
-                   // "> 40"
-                   final moreMatch = RegExp(r'>\s*([\d.]+)').firstMatch(rangeStr);
-                   if (moreMatch != null) {
-                       refLow = double.tryParse(moreMatch.group(1)!);
-                       refHigh = null;
-                   }
-                }
+             final parsedRange = parseReferenceRange(row.refRangeStr);
+             if (parsedRange.low != null || parsedRange.high != null) {
+               refLow = parsedRange.low;
+               refHigh = parsedRange.high;
              }
           }
 
