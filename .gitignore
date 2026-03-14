@@ -74,3 +74,6 @@ Thumbs.db
 
 # Extras
 .extras
+
+# Node tooling
+node_modules/

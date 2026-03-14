@@ -1,0 +1,11 @@
+{
+  "name": "koshika",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "format:dart": "dart format ."
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

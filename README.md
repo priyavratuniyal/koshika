@@ -81,6 +81,15 @@ dart run build_runner build --delete-conflicting-outputs
 flutter run
 ```
 
+### Optional: Auto-format on commit
+
+This repo includes a Husky `pre-commit` hook that auto-formats staged Dart files before the commit is created.
+
+If you're cloning fresh, install the hook setup with:
+```bash
+npm install
+```
+
 ## Current Limitations
 
 - Image-only or scanned PDFs are not yet supported; text must be extractable from the PDF.
