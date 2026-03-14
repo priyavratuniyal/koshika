@@ -13,7 +13,9 @@ Koshika is an offline-first, privacy-focused Flutter application designed to ext
 *   **Intelligent Regex Engine:** A multi-pattern matching fallback system specifically designed to handle unstructured formats typical of Indian pathology labs (Thyrocare, SRL, Dr. Lal, etc.).
 *   **Fuzzy Term Matching:** Standardizes raw lab terminology into an internal dictionary schema so that variations (e.g., "FASTING SUGAR" vs "Glucose F") align perfectly for historical tracking.
 *   **Private Database:** Data is persisted in lightning-fast `ObjectBox` document stores.
-*   **Beautiful Visualizations:** *(Coming Soon)* Dynamic charting with `fl_chart` to track your health trends over time.
+*   **Historical Trends & Detail Views:** Review biomarker history with charts, reference range gauges, and flag badges for abnormal values.
+*   **FHIR R4 Export:** Export imported reports and biomarker observations as a shareable FHIR bundle.
+*   **Beautiful Visualizations:** Dynamic charting with `fl_chart` to track your health trends over time.
 
 ## Platforms
 
@@ -29,6 +31,7 @@ This project uses standard Flutter `StatefulWidget` tree passing for local state
 - **Local DB:** ObjectBox
 - **Extraction:** syncfusion_flutter_pdf
 - **Text Analysis:** custom Multi-Regex Engine + string_similarity matching
+- **Export:** FHIR R4 bundle generation
 
 ## Project Structure
 
@@ -41,6 +44,13 @@ lib/
 assets/
 └── data/               # Local JSON dictionaries mapping lab terminology
 ```
+
+## Current App Flow
+
+- `Dashboard`: shows the latest biomarker snapshot, out-of-range markers, and category-wise summaries.
+- `Reports`: imports PDF lab reports, stores parsed results locally, and exports data as FHIR JSON.
+- `Biomarker Detail`: displays trend charts, reference ranges, and report history for a selected biomarker.
+- `AI Chat`: currently a placeholder for future on-device health-data chat.
 
 ## Getting Started
 
@@ -71,8 +81,16 @@ dart run build_runner build --delete-conflicting-outputs
 flutter run
 ```
 
+## Current Limitations
+
+- Image-only or scanned PDFs are not yet supported; text must be extractable from the PDF.
+- Web is planned, but the current implementation is focused on local mobile workflows.
+- The chat assistant is not implemented yet.
+
 ## Contributing
 Pull requests are welcome! If you find a lab report format that our parser fails to scrape, please consider opening an issue or contributing a regex fallback.
+
+When contributing, please keep each commit focused on one logical change and use clear conventional commit messages such as `feat:`, `fix:`, `chore:`, or `refactor:`.
 
 ## License
 This project is open-source and available under standard open source provisions.
