@@ -1,6 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
 import '../main.dart';
 import '../models/models.dart';
+import 'biomarker_detail_screen.dart';
+import '../widgets/flag_badge.dart';
+import '../services/fhir_export_service.dart';
 
 class ReportDetailScreen extends StatelessWidget {
   final int reportId;
@@ -34,6 +42,41 @@ class ReportDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(report.labName ?? report.originalFileName ?? 'Report Details'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.ios_share),
+            tooltip: 'Export as FHIR',
+            onPressed: () async {
+              try {
+                final patient = objectbox.getOrCreateDefaultPatient();
+                final fhirService = FhirExportService();
+                final jsonStr = fhirService.exportReport(
+                  patient: patient,
+                  report: report,
+                  results: results,
+                );
+
+                final tempDir = await getTemporaryDirectory();
+                final dateStr = DateTime.now().toIso8601String().split('T').first.replaceAll('-', '');
+                final labName = (report.labName ?? 'Lab').replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+                final timestamp = DateTime.now().millisecondsSinceEpoch;
+                final file = File(p.join(tempDir.path, 'koshika_${labName}_${dateStr}_$timestamp.fhir.json'));
+                await file.writeAsString(jsonStr);
+
+                await Share.shareXFiles(
+                  [XFile(file.path)],
+                  text: '${report.labName ?? "Lab"} Report (FHIR R4)',
+                );
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Export failed: $e')),
+                  );
+                }
+              }
+            },
+          ),
+        ],
       ),
       body: results.isEmpty 
               ? Center(
@@ -119,6 +162,11 @@ class ReportDetailScreen extends StatelessWidget {
                                 ),
                                 const Divider(height: 1),
                                 ...entry.value.map((r) => ListTile(
+                                   onTap: () => Navigator.of(context).push(
+                                     MaterialPageRoute(
+                                       builder: (_) => BiomarkerDetailScreen(biomarkerKey: r.biomarkerKey),
+                                     ),
+                                   ),
                                    title: Text(r.displayName),
                                    subtitle: Text('Range: ${r.formattedRefRange}'),
                                    trailing: Row(
@@ -132,7 +180,9 @@ class ReportDetailScreen extends StatelessWidget {
                                          ),
                                          Text(r.unit ?? ''),
                                          const SizedBox(width: 8),
-                                         _buildFlagBadge(r.flag, theme),
+                                         FlagBadge(flag: r.flag),
+                                         const SizedBox(width: 4),
+                                         const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
                                       ],
                                    ),
                                 )),
@@ -146,47 +196,4 @@ class ReportDetailScreen extends StatelessWidget {
         );
   }
 
-  Widget _buildFlagBadge(BiomarkerFlag flag, ThemeData theme) {
-     Color color;
-     String text;
-     
-     switch (flag) {
-        case BiomarkerFlag.normal:
-           color = Colors.green;
-           text = 'N';
-           break;
-        case BiomarkerFlag.low:
-           color = Colors.orange;
-           text = 'L';
-           break;
-        case BiomarkerFlag.high:
-           color = Colors.red;
-           text = 'H';
-           break;
-        case BiomarkerFlag.critical:
-           color = Colors.red[900]!;
-           text = 'C';
-           break;
-        case BiomarkerFlag.unknown:
-           color = Colors.grey;
-           text = '-';
-           break;
-     }
-
-     return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-           color: color.withValues(alpha: 0.2),
-           borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-           text,
-           style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-           ),
-        ),
-     );
-  }
 }
