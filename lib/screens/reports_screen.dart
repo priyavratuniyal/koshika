@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../main.dart';
 import '../models/models.dart';
+import '../services/extraction_diagnostics.dart';
 import '../services/fhir_export_service.dart';
 import '../services/lab_report_parser.dart';
 import '../services/pdf_import_service.dart';
@@ -70,6 +71,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (_isImporting) return;
 
     File? destFile;
+    final progressMessage = ValueNotifier<String>('Preparing import...');
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -88,13 +90,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const AlertDialog(
-            content: Row(
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 24),
-                Text('Importing lab report...'),
-              ],
+          builder: (context) => AlertDialog(
+            content: ValueListenableBuilder<String>(
+              valueListenable: progressMessage,
+              builder: (context, message, _) => Row(
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 24),
+                  Expanded(child: Text(message)),
+                ],
+              ),
             ),
           ),
         );
@@ -118,7 +123,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
         objectbox,
       );
 
-      final importResult = await service.importPdf(destPath);
+      final importResult = await service.importPdf(
+        destPath,
+        onProgress: (progress) {
+          progressMessage.value = progress.message;
+        },
+      );
 
       setState(() {
         _isImporting = false;
@@ -131,13 +141,42 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (!mounted) return;
 
       if (importResult.success) {
+        final successMessage = importResult.warnings.isEmpty
+            ? 'Imported ${importResult.successfulMatches} biomarkers'
+            : 'Imported ${importResult.successfulMatches} biomarkers with warnings';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Imported ${importResult.successfulMatches} biomarkers',
-            ),
+            content: Text(successMessage),
+            duration: const Duration(seconds: 3),
           ),
         );
+
+        if (importResult.warnings.isNotEmpty) {
+          await showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(
+                importResult.extractionMethod == ExtractionMethod.digital
+                    ? 'Import Warnings'
+                    : 'OCR Import Warnings',
+              ),
+              content: SizedBox(
+                width: 360,
+                child: SingleChildScrollView(
+                  child: Text(importResult.warnings.join('\n\n')),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (!mounted) return;
 
         if (importResult.report != null) {
           Navigator.of(context)
@@ -159,8 +198,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Import Failed'),
-            content: Text(importResult.errorMessage ?? 'Unknown error'),
+            title: Text(_failureTitle(importResult.failureReason)),
+            content: Text(_failureMessage(importResult)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -183,7 +222,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
+    } finally {
+      progressMessage.dispose();
     }
+  }
+
+  String _failureTitle(ImportFailureReason? reason) {
+    switch (reason) {
+      case ImportFailureReason.encryptedPdf:
+        return 'Encrypted PDF';
+      case ImportFailureReason.invalidPdf:
+        return 'Invalid PDF';
+      case ImportFailureReason.ocrFailed:
+        return 'OCR Failed';
+      case ImportFailureReason.unsupportedFormat:
+        return 'Unsupported Report';
+      case ImportFailureReason.timeout:
+        return 'Import Timed Out';
+      default:
+        return 'Import Failed';
+    }
+  }
+
+  String _failureMessage(ImportResult importResult) {
+    final message = importResult.errorMessage ?? 'Unknown error';
+    if (importResult.warnings.isEmpty) return message;
+    return '$message\n\nWarnings:\n${importResult.warnings.join('\n')}';
   }
 
   @override

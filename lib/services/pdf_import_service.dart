@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 import '../models/models.dart';
 import 'objectbox_store.dart';
 import 'biomarker_dictionary.dart';
+import 'extraction_diagnostics.dart';
 import 'pdf_text_extractor.dart';
 import 'lab_report_parser.dart';
 
@@ -15,6 +16,8 @@ class ImportResult {
   final List<String> unmatchedTests;
   final List<String> warnings;
   final String? errorMessage;
+  final ImportFailureReason? failureReason;
+  final ExtractionMethod extractionMethod;
 
   ImportResult({
     required this.success,
@@ -25,6 +28,8 @@ class ImportResult {
     this.unmatchedTests = const [],
     this.warnings = const [],
     this.errorMessage,
+    this.failureReason,
+    this.extractionMethod = ExtractionMethod.digital,
   });
 }
 
@@ -44,7 +49,7 @@ class PdfImportService {
   static double? parseNumericValue(String? rawValue) {
     if (rawValue == null) return null;
 
-    final trimmed = rawValue.trim();
+    final trimmed = normalizeResultValue(rawValue);
     if (trimmed.isEmpty) return null;
 
     final match = RegExp(
@@ -82,7 +87,7 @@ class PdfImportService {
       return (low: null, high: null);
     }
 
-    final trimmedRange = rawRange.trim();
+    final trimmedRange = normalizeResultValue(rawRange);
     final rangeStr = trimmedRange
         .replaceAll(RegExp(r'[a-z/%µ]+', caseSensitive: false), '')
         .trim();
@@ -115,37 +120,85 @@ class PdfImportService {
     return (low: null, high: null);
   }
 
-  Future<ImportResult> importPdf(String filePath) async {
+  static String normalizeResultValue(String rawValue) {
+    var normalized = rawValue.trim();
+    if (normalized.isEmpty) return normalized;
+
+    normalized = normalized.replaceAll('—', '-').replaceAll('–', '-');
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'(^|[<>\s])([lI])(?=[\d.])'),
+      (match) => '${match.group(1)}1',
+    );
+    normalized = normalized.replaceAllMapped(
+      RegExp(r'(?<=\d),(?=\d{1,2}\b)'),
+      (_) => '.',
+    );
+    normalized = normalized.replaceAll('..', '.');
+    normalized = normalized.replaceAll(RegExp(r'\s+'), ' ');
+    return normalized.trim();
+  }
+
+  Future<ImportResult> importPdf(
+    String filePath, {
+    void Function(ImportProgress progress)? onProgress,
+  }) async {
     final List<String> warnings = [];
     final List<String> unmatchedTests = [];
 
     try {
       // 1. Extract text
+      onProgress?.call(
+        const ImportProgress(
+          stage: ImportStage.readingPdf,
+          message: 'Reading PDF...',
+        ),
+      );
       final PdfExtractionResult extractResult = await _extractor.extractText(
         filePath,
+        onProgress: onProgress,
       );
+      warnings.addAll(extractResult.warnings);
 
       if (extractResult.isEmpty) {
         return ImportResult(
           success: false,
           errorMessage:
-              'This PDF appears to be a scanned image or empty. Text extraction from images is not yet supported.',
+              'This PDF could not be read as selectable text, and OCR did not recover enough readable data.',
+          failureReason: ImportFailureReason.unsupportedFormat,
+          extractionMethod: extractResult.extractionMethod,
         );
       }
 
       // 2. Parse raw text into candidate rows
+      onProgress?.call(
+        const ImportProgress(
+          stage: ImportStage.parsingRows,
+          message: 'Parsing lab values...',
+        ),
+      );
       final List<RawLabRow> candidateRows = _parser.parseRawText(
         extractResult.fullText,
       );
       final int totalRows = candidateRows.length;
 
       if (totalRows == 0) {
-        warnings.add(
-          'No biomarker data was found in this PDF. It may not be a lab report, or the format is not recognized.',
+        return ImportResult(
+          success: false,
+          warnings: warnings,
+          errorMessage:
+              'No biomarker rows were detected. The report may be too blurry or use an unsupported layout.',
+          failureReason: ImportFailureReason.unsupportedFormat,
+          extractionMethod: extractResult.extractionMethod,
         );
       }
 
       // 3. Match candidate rows to the dictionary and build BiomarkerResults
+      onProgress?.call(
+        const ImportProgress(
+          stage: ImportStage.matchingBiomarkers,
+          message: 'Matching biomarkers...',
+        ),
+      );
       final Map<String, BiomarkerResult> bestMatches =
           {}; // Use Map for de-duplication
 
@@ -205,6 +258,9 @@ class PdfImportService {
           );
 
           result.computeFlag();
+          if (result.flag == BiomarkerFlag.unknown && row.inlineFlag != null) {
+            result.flag = _mapInlineFlag(row.inlineFlag);
+          }
           bestMatches[def.key] = result;
         } else {
           // No good match found
@@ -214,6 +270,20 @@ class PdfImportService {
 
       final List<BiomarkerResult> finalResults = bestMatches.values.toList();
       final int successCount = finalResults.length;
+
+      if (successCount == 0) {
+        return ImportResult(
+          success: false,
+          warnings: warnings,
+          unmatchedTests: unmatchedTests,
+          totalRowsDetected: totalRows,
+          successfulMatches: 0,
+          errorMessage:
+              'Lab-like rows were found, but none matched the biomarker dictionary confidently.',
+          failureReason: ImportFailureReason.unsupportedFormat,
+          extractionMethod: extractResult.extractionMethod,
+        );
+      }
 
       // Create Report object
       final String originalFileName = p.basename(filePath);
@@ -229,13 +299,26 @@ class PdfImportService {
       );
       report.patient.target = _store.getOrCreateDefaultPatient();
 
-      // Always save the report so it appears in history, even with 0 results
+      onProgress?.call(
+        const ImportProgress(
+          stage: ImportStage.savingResults,
+          message: 'Saving results...',
+        ),
+      );
       try {
         _store.saveReportWithResults(report, finalResults);
       } catch (e) {
         return ImportResult(
           success: false,
           errorMessage: 'Failed to save results to database: $e',
+          failureReason: ImportFailureReason.unknown,
+          extractionMethod: extractResult.extractionMethod,
+        );
+      }
+
+      if (extractResult.extractionMethod != ExtractionMethod.digital) {
+        warnings.add(
+          'Some pages required OCR. Please review imported values carefully.',
         );
       }
 
@@ -247,12 +330,43 @@ class PdfImportService {
         successfulMatches: successCount,
         unmatchedTests: unmatchedTests,
         warnings: warnings,
+        extractionMethod: extractResult.extractionMethod,
       );
     } catch (e) {
+      final lower = e.toString().toLowerCase();
+      ImportFailureReason reason = ImportFailureReason.unknown;
+      if (lower.contains('file not found')) {
+        reason = ImportFailureReason.fileNotFound;
+      } else if (lower.contains('password protected') ||
+          lower.contains('encrypted')) {
+        reason = ImportFailureReason.encryptedPdf;
+      } else if (lower.contains('valid or supported pdf')) {
+        reason = ImportFailureReason.invalidPdf;
+      } else if (lower.contains('timeout')) {
+        reason = ImportFailureReason.timeout;
+      } else if (lower.contains('ocr')) {
+        reason = ImportFailureReason.ocrFailed;
+      }
+
       return ImportResult(
         success: false,
         errorMessage: 'An unexpected error occurred during import: $e',
+        failureReason: reason,
       );
+    }
+  }
+
+  static BiomarkerFlag _mapInlineFlag(String? inlineFlag) {
+    switch (inlineFlag?.toUpperCase()) {
+      case 'L':
+      case 'LOW':
+        return BiomarkerFlag.low;
+      case 'H':
+      case 'HIGH':
+      case '*':
+        return BiomarkerFlag.high;
+      default:
+        return BiomarkerFlag.unknown;
     }
   }
 }

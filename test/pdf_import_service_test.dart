@@ -19,6 +19,11 @@ void main() {
       expect(PdfImportService.parseNumericValue('Reactive'), isNull);
       expect(PdfImportService.parseNumericValue(null), isNull);
     });
+
+    test('normalizes common OCR artifacts before parsing', () {
+      expect(PdfImportService.parseNumericValue('l.0'), 1.0);
+      expect(PdfImportService.parseNumericValue('5,4'), 5.4);
+    });
   });
 
   group('PdfImportService.parseReferenceRange', () {
