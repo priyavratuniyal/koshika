@@ -10,6 +10,7 @@ Koshika is an offline-first, privacy-focused Flutter application designed to ext
 ## Features
 
 *   **On-Device PDF Parsing:** Extracts raw text and structure from PDFs securely using `syncfusion_flutter_pdf` without sending your personal health data to the cloud.
+*   **OCR Fallback for Scanned Reports:** When a PDF page has little or no selectable text, the app can render that page locally and run on-device OCR to recover lab values.
 *   **Intelligent Regex Engine:** A multi-pattern matching fallback system specifically designed to handle unstructured formats typical of Indian pathology labs (Thyrocare, SRL, Dr. Lal, etc.).
 *   **Fuzzy Term Matching:** Standardizes raw lab terminology into an internal dictionary schema so that variations (e.g., "FASTING SUGAR" vs "Glucose F") align perfectly for historical tracking.
 *   **Private Database:** Data is persisted in lightning-fast `ObjectBox` document stores.
@@ -30,6 +31,7 @@ This project uses standard Flutter `StatefulWidget` tree passing for local state
 - **Frontend:** Flutter
 - **Local DB:** ObjectBox
 - **Extraction:** syncfusion_flutter_pdf
+- **OCR Fallback:** google_mlkit_text_recognition + pdfx
 - **Text Analysis:** custom Multi-Regex Engine + string_similarity matching
 - **Export:** FHIR R4 bundle generation
 
@@ -49,6 +51,7 @@ assets/
 
 - `Dashboard`: shows the latest biomarker snapshot, out-of-range markers, and category-wise summaries.
 - `Reports`: imports PDF lab reports, stores parsed results locally, and exports data as FHIR JSON.
+- `Reports`: shows staged progress while importing, including OCR fallback warnings for scanned or mixed PDFs.
 - `Biomarker Detail`: displays trend charts, reference ranges, and report history for a selected biomarker.
 - `AI Chat`: currently a placeholder for future on-device health-data chat.
 
@@ -92,7 +95,7 @@ npm install
 
 ## Current Limitations
 
-- Image-only or scanned PDFs are not yet supported; text must be extractable from the PDF.
+- OCR support for scanned or photographed PDF reports is experimental and still needs validation against more real-world lab formats.
 - Web is planned, but the current implementation is focused on local mobile workflows.
 - The chat assistant is not implemented yet.
 
