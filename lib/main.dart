@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'services/objectbox_store.dart';
 import 'services/biomarker_dictionary.dart';
+import 'services/gemma_service.dart';
 import 'screens/chat_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/reports_screen.dart';
@@ -9,6 +10,7 @@ import 'screens/reports_screen.dart';
 /// Global references — initialized in main() before runApp.
 late final ObjectBoxStore objectbox;
 late final BiomarkerDictionary biomarkerDictionary;
+late final GemmaService gemmaService;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +24,10 @@ Future<void> main() async {
 
   // Create default patient profile
   objectbox.getOrCreateDefaultPatient();
+
+  // Initialize Gemma service (checks if model exists on disk — never blocks)
+  gemmaService = GemmaService();
+  await gemmaService.initialize();
 
   runApp(const KoshikaApp());
 }
