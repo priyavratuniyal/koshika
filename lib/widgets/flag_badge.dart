@@ -16,6 +16,10 @@ class FlagBadge extends StatelessWidget {
         color = Colors.green;
         text = 'N';
         break;
+      case BiomarkerFlag.borderline:
+        color = Colors.amber;
+        text = 'B';
+        break;
       case BiomarkerFlag.low:
         color = Colors.orange;
         text = 'L';

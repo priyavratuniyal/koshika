@@ -5,6 +5,7 @@ import '../models/models.dart';
 class DashboardSummaryCard extends StatelessWidget {
   final int totalTracked;
   final int normalCount;
+  final int borderlineCount;
   final int lowCount;
   final int highCount;
   final int criticalCount;
@@ -15,6 +16,7 @@ class DashboardSummaryCard extends StatelessWidget {
     super.key,
     required this.totalTracked,
     required this.normalCount,
+    this.borderlineCount = 0,
     required this.lowCount,
     required this.highCount,
     required this.criticalCount,
@@ -72,6 +74,13 @@ class DashboardSummaryCard extends StatelessWidget {
               children: [
                 if (normalCount > 0)
                   _buildStatChip(context, 'Normal', normalCount, Colors.green),
+                if (borderlineCount > 0)
+                  _buildStatChip(
+                    context,
+                    'Borderline',
+                    borderlineCount,
+                    Colors.amber,
+                  ),
                 if (lowCount > 0)
                   _buildStatChip(context, 'Low', lowCount, Colors.orange),
                 if (highCount > 0)

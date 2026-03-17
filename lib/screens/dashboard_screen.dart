@@ -60,12 +60,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     int highCount = 0;
     int criticalCount = 0;
     int unknownCount = 0;
+    int borderlineCount = 0;
     final outOfRangeResults = <BiomarkerResult>[];
 
     for (final r in latestResults.values) {
       switch (r.flag) {
         case BiomarkerFlag.normal:
           normalCount++;
+        case BiomarkerFlag.borderline:
+          borderlineCount++;
+          outOfRangeResults.add(r);
         case BiomarkerFlag.low:
           lowCount++;
           outOfRangeResults.add(r);
@@ -140,6 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 DashboardSummaryCard(
                   totalTracked: latestResults.length,
                   normalCount: normalCount,
+                  borderlineCount: borderlineCount,
                   lowCount: lowCount,
                   highCount: highCount,
                   criticalCount: criticalCount,
@@ -252,6 +257,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 case BiomarkerFlag.low:
                                   bgColor = Colors.orange.withValues(
                                     alpha: 0.05,
+                                  );
+                                case BiomarkerFlag.borderline:
+                                  bgColor = Colors.amber.withValues(
+                                    alpha: 0.08,
                                   );
                                 case BiomarkerFlag.high:
                                   bgColor = Colors.red.withValues(alpha: 0.05);

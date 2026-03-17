@@ -234,6 +234,8 @@ class FhirExportService {
     switch (flag) {
       case BiomarkerFlag.normal:
         return {'code': 'N', 'display': 'Normal'};
+      case BiomarkerFlag.borderline:
+        return {'code': 'IND', 'display': 'Indeterminate'};
       case BiomarkerFlag.low:
         return {'code': 'L', 'display': 'Low'};
       case BiomarkerFlag.high:

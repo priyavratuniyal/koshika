@@ -141,7 +141,8 @@ class ChatContextBuilder {
           (r) =>
               r.flag == BiomarkerFlag.high ||
               r.flag == BiomarkerFlag.low ||
-              r.flag == BiomarkerFlag.critical,
+              r.flag == BiomarkerFlag.critical ||
+              r.flag == BiomarkerFlag.borderline,
         )
         .toList();
 
@@ -234,6 +235,8 @@ class ChatContextBuilder {
     switch (flag) {
       case BiomarkerFlag.normal:
         return 'NORMAL';
+      case BiomarkerFlag.borderline:
+        return 'BORDERLINE';
       case BiomarkerFlag.low:
         return 'LOW';
       case BiomarkerFlag.high:

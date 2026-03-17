@@ -35,9 +35,30 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString();
+        _errorMessage = _classifyError(e);
       });
     }
+  }
+
+  String _classifyError(dynamic error) {
+    final msg = error.toString().toLowerCase();
+    if (msg.contains('objectbox') ||
+        msg.contains('store') ||
+        msg.contains('box')) {
+      return 'Unable to access stored data. Please restart the app and try again.';
+    }
+    if (msg.contains('relation') || msg.contains('target')) {
+      return 'Data relationship error. The linked report may have been deleted.';
+    }
+    if (msg.contains('date') ||
+        msg.contains('format') ||
+        msg.contains('parse')) {
+      return 'Invalid date found in stored data. Try re-importing the affected report.';
+    }
+    if (msg.contains('range') || msg.contains('index')) {
+      return 'Data index error. Please restart the app.';
+    }
+    return 'Could not load biomarker data. Please try again.';
   }
 
   @override
@@ -55,15 +76,32 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
       return Scaffold(
         appBar: AppBar(title: const Text('Error')),
         body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(_errorMessage!),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _isLoading = true;
+                      _errorMessage = null;
+                    });
+                    _loadData();
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -226,22 +264,26 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
               itemBuilder: (context, index) {
                 final result = history[index];
                 final report = result.report.target;
+                final rowColor = _flagRowColor(result.flag);
 
-                return ListTile(
-                  title: Row(
-                    children: [
-                      Text(
-                        '${result.formattedValue} ${result.unit ?? ""}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                return Container(
+                  color: rowColor,
+                  child: ListTile(
+                    title: Row(
+                      children: [
+                        Text(
+                          '${result.formattedValue} ${result.unit ?? ""}',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      FlagBadge(flag: result.flag),
-                    ],
-                  ),
-                  subtitle: Text(
-                    '${DateFormat.yMMMd().format(result.testDate)} • ${report?.labName ?? "Unknown Lab"}',
+                        const SizedBox(width: 12),
+                        FlagBadge(flag: result.flag),
+                      ],
+                    ),
+                    subtitle: Text(
+                      '${DateFormat.yMMMd().format(result.testDate)} • ${report?.labName ?? "Unknown Lab"}',
+                    ),
                   ),
                 );
               },
@@ -250,5 +292,23 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// Map a [BiomarkerFlag] to a subtle row background color.
+  Color _flagRowColor(BiomarkerFlag flag) {
+    switch (flag) {
+      case BiomarkerFlag.normal:
+        return Colors.green.withValues(alpha: 0.06);
+      case BiomarkerFlag.borderline:
+        return Colors.amber.withValues(alpha: 0.10);
+      case BiomarkerFlag.low:
+        return Colors.orange.withValues(alpha: 0.08);
+      case BiomarkerFlag.high:
+        return Colors.red.withValues(alpha: 0.08);
+      case BiomarkerFlag.critical:
+        return Colors.red.withValues(alpha: 0.14);
+      case BiomarkerFlag.unknown:
+        return Colors.transparent;
+    }
   }
 }

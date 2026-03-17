@@ -294,6 +294,8 @@ class BiomarkerTrendChart extends StatelessWidget {
     switch (flag) {
       case BiomarkerFlag.normal:
         return 'N';
+      case BiomarkerFlag.borderline:
+        return 'B';
       case BiomarkerFlag.low:
         return 'L';
       case BiomarkerFlag.high:

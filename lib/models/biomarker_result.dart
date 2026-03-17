@@ -2,7 +2,10 @@ import 'package:objectbox/objectbox.dart';
 import 'lab_report.dart';
 
 /// Flag indicating whether a biomarker value is within reference range.
-enum BiomarkerFlag { normal, low, high, critical, unknown }
+///
+/// Index order matters — [flagIndex] is stored as int in ObjectBox.
+/// Append new values at the end to avoid breaking existing data.
+enum BiomarkerFlag { normal, low, high, critical, unknown, borderline }
 
 /// Represents a single parsed biomarker result from a lab report.
 /// This is the core data unit of the app — each row in a lab report
@@ -86,7 +89,10 @@ class BiomarkerResult {
   /// Convenience setter for the flag enum
   set flag(BiomarkerFlag f) => flagIndex = f.index;
 
-  /// Compute the flag based on the value and reference range
+  /// Compute the flag based on the value and reference range.
+  ///
+  /// Values within 10% of a boundary are marked [BiomarkerFlag.borderline]
+  /// (rendered as amber in the UI) to alert users before they go out of range.
   void computeFlag() {
     if (value == null) {
       flagIndex = BiomarkerFlag.unknown.index;
@@ -101,18 +107,35 @@ class BiomarkerResult {
       } else if (v > refHigh!) {
         flagIndex = BiomarkerFlag.high.index;
       } else {
-        flagIndex = BiomarkerFlag.normal.index;
+        // In range — check if borderline (within 10% of either boundary)
+        final range = refHigh! - refLow!;
+        final margin = range * 0.10;
+        if (margin > 0 && (v <= refLow! + margin || v >= refHigh! - margin)) {
+          flagIndex = BiomarkerFlag.borderline.index;
+        } else {
+          flagIndex = BiomarkerFlag.normal.index;
+        }
       }
     } else if (refHigh != null) {
       // Only upper bound (e.g., Cholesterol < 200)
-      flagIndex = v > refHigh!
-          ? BiomarkerFlag.high.index
-          : BiomarkerFlag.normal.index;
+      if (v > refHigh!) {
+        flagIndex = BiomarkerFlag.high.index;
+      } else {
+        final margin = refHigh! * 0.10;
+        flagIndex = (margin > 0 && v >= refHigh! - margin)
+            ? BiomarkerFlag.borderline.index
+            : BiomarkerFlag.normal.index;
+      }
     } else if (refLow != null) {
       // Only lower bound
-      flagIndex = v < refLow!
-          ? BiomarkerFlag.low.index
-          : BiomarkerFlag.normal.index;
+      if (v < refLow!) {
+        flagIndex = BiomarkerFlag.low.index;
+      } else {
+        final margin = refLow! * 0.10;
+        flagIndex = (margin > 0 && v <= refLow! + margin)
+            ? BiomarkerFlag.borderline.index
+            : BiomarkerFlag.normal.index;
+      }
     } else {
       flagIndex = BiomarkerFlag.unknown.index;
     }
