@@ -172,6 +172,9 @@ CRITICAL RULES:
   // ═══════════════════════════════════════════════════════════════════
 
   /// Load the model into memory. Must be in [ModelStatus.ready] state.
+  ///
+  /// Tries GPU first for best performance, then falls back to CPU if GPU
+  /// acceleration fails (common on older or low-end devices).
   Future<void> loadModel() async {
     if (_modelInfo.status != ModelStatus.ready) {
       throw StateError(
@@ -182,6 +185,7 @@ CRITICAL RULES:
 
     _updateStatus(_modelInfo.copyWith(status: ModelStatus.loading));
 
+    // Try GPU first
     try {
       _activeModel = await FlutterGemma.getActiveModel(
         maxTokens: _maxTokens,
@@ -189,12 +193,46 @@ CRITICAL RULES:
       );
 
       _updateStatus(_modelInfo.copyWith(status: ModelStatus.loaded));
-    } catch (e) {
+      return;
+    } catch (gpuError) {
+      final msg = gpuError.toString().toLowerCase();
+      final isGpuSpecific =
+          msg.contains('gpu') ||
+          msg.contains('delegate') ||
+          msg.contains('accelerat') ||
+          msg.contains('gl_') ||
+          msg.contains('opencl') ||
+          msg.contains('vulkan');
+
+      if (!isGpuSpecific) {
+        // Not a GPU-specific failure — don't retry, surface the real error
+        _activeModel = null;
+        _updateStatus(
+          _modelInfo.copyWith(
+            status: ModelStatus.error,
+            errorMessage: _classifyLoadError(gpuError),
+          ),
+        );
+        return;
+      }
+
+      // GPU failed with a GPU-specific error — fall back to CPU
+    }
+
+    // CPU fallback
+    try {
+      _activeModel = await FlutterGemma.getActiveModel(
+        maxTokens: _maxTokens,
+        preferredBackend: PreferredBackend.cpu,
+      );
+
+      _updateStatus(_modelInfo.copyWith(status: ModelStatus.loaded));
+    } catch (cpuError) {
       _activeModel = null;
       _updateStatus(
         _modelInfo.copyWith(
           status: ModelStatus.error,
-          errorMessage: _classifyLoadError(e),
+          errorMessage: _classifyLoadError(cpuError),
         ),
       );
     }
@@ -360,8 +398,8 @@ CRITICAL RULES:
           'Please delete the model and re-download it.';
     }
     if (msg.contains('gpu') || msg.contains('delegate')) {
-      return 'GPU acceleration failed. '
-          'The model will try CPU inference, which may be slower.';
+      return 'GPU and CPU inference both failed on this device. '
+          'The model may not be compatible with your hardware.';
     }
     return 'Failed to load model: ${error.toString().length > 100 ? '${error.toString().substring(0, 100)}...' : error}';
   }
