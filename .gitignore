@@ -1,6 +1,8 @@
 # Flutter/Dart
 # https://dart.dev/guides/libraries/private-files
 .dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
 .packages
 .pub-cache/
 .pub/
