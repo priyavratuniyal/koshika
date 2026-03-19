@@ -113,7 +113,8 @@ class BiomarkerTrendChart extends StatelessWidget {
       barDataList.add(lowLine);
     }
 
-    // Add main data line
+    // Add main data line — store its index for tooltip filtering
+    final mainDataLineIndex = barDataList.length;
     final mainDataLine = LineChartBarData(
       spots: spots,
       isCurved: false,
@@ -127,7 +128,8 @@ class BiomarkerTrendChart extends StatelessWidget {
           Color dotColor = Colors.green;
           if (result.flag == BiomarkerFlag.high ||
               result.flag == BiomarkerFlag.low ||
-              result.flag == BiomarkerFlag.critical) {
+              result.flag == BiomarkerFlag.critical ||
+              result.flag == BiomarkerFlag.borderline) {
             dotColor = Colors.red;
           }
           return FlDotCirclePainter(
@@ -243,7 +245,7 @@ class BiomarkerTrendChart extends StatelessWidget {
                   getTooltipItems: (touchedSpots) {
                     return touchedSpots.map((spot) {
                       // Filter out touches on the reference band lines
-                      if (spot.barIndex != barDataList.indexOf(mainDataLine)) {
+                      if (spot.barIndex != mainDataLineIndex) {
                         return null;
                       }
                       final result = numericResults[spot.spotIndex];

@@ -70,6 +70,27 @@ class ObjectBoxStore {
     return results;
   }
 
+  /// Batch-fetch history for multiple biomarker keys in a single query.
+  ///
+  /// Returns a map of biomarkerKey → list of results (newest first).
+  /// Used by DashboardScreen to avoid N+1 queries when computing trends.
+  Map<String, List<BiomarkerResult>> getHistoryForBiomarkers(Set<String> keys) {
+    if (keys.isEmpty) return {};
+
+    final query = biomarkerResultBox.query(
+      BiomarkerResult_.biomarkerKey.oneOf(keys.toList()),
+    )..order(BiomarkerResult_.testDate, flags: Order.descending);
+    final built = query.build();
+    final all = built.find();
+    built.close();
+
+    final result = <String, List<BiomarkerResult>>{};
+    for (final r in all) {
+      result.putIfAbsent(r.biomarkerKey, () => []).add(r);
+    }
+    return result;
+  }
+
   /// Get the latest result for each unique biomarker key
   Map<String, BiomarkerResult> getLatestResults() {
     final all = biomarkerResultBox.query()

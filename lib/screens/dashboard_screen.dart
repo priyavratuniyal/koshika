@@ -85,9 +85,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     final trendMap = <String, ({Color color, IconData icon})>{};
+    final allHistories = objectbox.getHistoryForBiomarkers(
+      latestResults.keys.toSet(),
+    );
     for (final key in latestResults.keys) {
-      final history = objectbox.getHistoryForBiomarker(key);
-      trendMap[key] = _getTrend(history);
+      trendMap[key] = _getTrend(allHistories[key] ?? []);
     }
 
     outOfRangeResults.sort((a, b) {

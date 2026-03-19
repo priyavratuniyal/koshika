@@ -42,7 +42,8 @@ class ReportDetailScreen extends StatelessWidget {
           (r) =>
               r.flag == BiomarkerFlag.high ||
               r.flag == BiomarkerFlag.low ||
-              r.flag == BiomarkerFlag.critical,
+              r.flag == BiomarkerFlag.critical ||
+              r.flag == BiomarkerFlag.borderline,
         )
         .length;
 
@@ -89,9 +90,10 @@ class ReportDetailScreen extends StatelessWidget {
                 ], text: '${report.labName ?? "Lab"} Report (FHIR R4)');
               } catch (e) {
                 if (context.mounted) {
+                  final msg = _classifyExportError(e);
                   ScaffoldMessenger.of(
                     context,
-                  ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+                  ).showSnackBar(SnackBar(content: Text(msg)));
                 }
               }
             },
@@ -223,5 +225,18 @@ class ReportDetailScreen extends StatelessWidget {
               ],
             ),
     );
+  }
+
+  static String _classifyExportError(dynamic e) {
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('storage') ||
+        msg.contains('space') ||
+        msg.contains('permission')) {
+      return 'Unable to save file. Check available storage and permissions.';
+    }
+    if (msg.contains('share') || msg.contains('activity')) {
+      return 'Sharing is not available on this device.';
+    }
+    return 'Export failed. Please try again.';
   }
 }
