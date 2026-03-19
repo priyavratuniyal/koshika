@@ -1,23 +1,31 @@
 import 'dart:convert';
+import 'package:fhir_r4/fhir_r4.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
+import 'package:uuid/uuid.dart' as pkg_uuid;
 
-import '../models/models.dart';
+import '../models/models.dart' as app;
 
+/// Exports patient health data as spec-compliant FHIR R4 Bundles
+/// using the typed [fhir_r4] package.
 class FhirExportService {
-  final _uuid = const Uuid();
+  final _uuid = const pkg_uuid.Uuid();
 
-  /// Export all data as a single FHIR R4 Bundle
+  // ─── Public API ─────────────────────────────────────────────────────
+
+  /// Export all reports as a single FHIR R4 collection Bundle.
   String exportAll({
-    required Patient patient,
-    required List<LabReport> reports,
-    required Map<int, List<BiomarkerResult>> resultsByReport,
+    required app.Patient patient,
+    required List<app.LabReport> reports,
+    required Map<int, List<app.BiomarkerResult>> resultsByReport,
   }) {
     final patientId = _uuid.v4();
-    final patientResource = _buildPatientResource(patient, patientId);
+    final patientResource = _buildPatient(patient, patientId);
 
-    final entries = <Map<String, dynamic>>[
-      {'fullUrl': 'urn:uuid:$patientId', 'resource': patientResource},
+    final entries = <BundleEntry>[
+      BundleEntry(
+        fullUrl: FhirUri('urn:uuid:$patientId'),
+        resource: patientResource,
+      ),
     ];
 
     for (final report in reports) {
@@ -25,47 +33,53 @@ class FhirExportService {
       if (results.isEmpty) continue;
 
       final reportId = _uuid.v4();
-      final obsRefs = <Map<String, String>>[];
+      final obsRefs = <Reference>[];
 
       for (final result in results) {
         final obsId = _uuid.v4();
-        final obsResource = _buildObservationResource(
+        final observation = _buildObservation(
           result: result,
           obsId: obsId,
           patientId: patientId,
         );
-        entries.add({'fullUrl': 'urn:uuid:$obsId', 'resource': obsResource});
-        obsRefs.add({'reference': 'Observation/$obsId'});
+        entries.add(
+          BundleEntry(
+            fullUrl: FhirUri('urn:uuid:$obsId'),
+            resource: observation,
+          ),
+        );
+        obsRefs.add(Reference(reference: 'Observation/$obsId'.toFhirString));
       }
 
-      final reportResource = _buildDiagnosticReportResource(
+      final diagnosticReport = _buildDiagnosticReport(
         report: report,
         reportId: reportId,
         patientId: patientId,
-        observationReferences: obsRefs,
+        observationRefs: obsRefs,
       );
-      entries.add({
-        'fullUrl': 'urn:uuid:$reportId',
-        'resource': reportResource,
-      });
+      entries.add(
+        BundleEntry(
+          fullUrl: FhirUri('urn:uuid:$reportId'),
+          resource: diagnosticReport,
+        ),
+      );
     }
 
-    final bundle = {
-      'resourceType': 'Bundle',
-      'id': _uuid.v4(),
-      'type': 'collection',
-      'timestamp': DateTime.now().toUtc().toIso8601String(),
-      'entry': entries,
-    };
+    final bundle = Bundle(
+      id: _uuid.v4().toFhirString,
+      type: BundleType.collection,
+      timestamp: DateTime.now().toUtc().toFhirInstant,
+      entry: entries,
+    );
 
-    return jsonEncode(bundle);
+    return jsonEncode(bundle.toJson());
   }
 
-  /// Export a single report as a FHIR R4 Bundle
+  /// Export a single report as a FHIR R4 Bundle.
   String exportReport({
-    required Patient patient,
-    required LabReport report,
-    required List<BiomarkerResult> results,
+    required app.Patient patient,
+    required app.LabReport report,
+    required List<app.BiomarkerResult> results,
   }) {
     return exportAll(
       patient: patient,
@@ -74,181 +88,195 @@ class FhirExportService {
     );
   }
 
-  Map<String, dynamic> _buildPatientResource(Patient patient, String id) {
-    final resource = <String, dynamic>{
-      'resourceType': 'Patient',
-      'id': id,
-      'name': [
-        {'text': patient.name},
-      ],
-      'gender': _mapGender(patient.sex),
-    };
+  // ─── Resource Builders ──────────────────────────────────────────────
 
-    if (patient.dateOfBirth != null) {
-      resource['birthDate'] = DateFormat(
-        'yyyy-MM-dd',
-      ).format(patient.dateOfBirth!);
-    }
+  Patient _buildPatient(app.Patient patient, String id) {
+    final name = <HumanName>[HumanName(text: patient.name.toFhirString)];
 
-    return resource;
+    return Patient(
+      id: id.toFhirString,
+      name: name,
+      gender: _mapGenderEnum(patient.sex),
+      birthDate: patient.dateOfBirth != null
+          ? DateFormat('yyyy-MM-dd').format(patient.dateOfBirth!).toFhirDate
+          : null,
+    );
   }
 
-  String _mapGender(String? sex) {
-    switch (sex) {
-      case 'M':
-        return 'male';
-      case 'F':
-        return 'female';
-      case 'O':
-        return 'other';
-      default:
-        return 'unknown';
-    }
-  }
-
-  Map<String, dynamic> _buildObservationResource({
-    required BiomarkerResult result,
+  Observation _buildObservation({
+    required app.BiomarkerResult result,
     required String obsId,
     required String patientId,
   }) {
-    final resource = <String, dynamic>{
-      'resourceType': 'Observation',
-      'id': obsId,
-      'status': 'final',
-      'category': [
-        {
-          'coding': [
-            {
-              'system':
-                  'http://terminology.hl7.org/CodeSystem/observation-category',
-              'code': 'laboratory',
-              'display': 'Laboratory',
-            },
-          ],
-        },
-      ],
-      'subject': {'reference': 'Patient/$patientId'},
-      'effectiveDateTime': DateFormat('yyyy-MM-dd').format(result.testDate),
-    };
-
-    // Code (LOINC or Text)
+    // Code (LOINC or free-text)
+    final coding = <Coding>[];
     if (result.loincCode != null && result.loincCode!.isNotEmpty) {
-      resource['code'] = {
-        'coding': [
-          {
-            'system': 'http://loinc.org',
-            'code': result.loincCode,
-            'display': result.displayName,
-          },
-        ],
-        'text': result.displayName,
-      };
-    } else {
-      resource['code'] = {'text': result.displayName};
+      coding.add(
+        Coding(
+          system: FhirUri('http://loinc.org'),
+          code: FhirCode(result.loincCode!),
+          display: result.displayName.toFhirString,
+        ),
+      );
     }
+
+    final code = CodeableConcept(
+      coding: coding.isNotEmpty ? coding : null,
+      text: result.displayName.toFhirString,
+    );
+
+    // Category — laboratory
+    final category = <CodeableConcept>[
+      CodeableConcept(
+        coding: [
+          Coding(
+            system: FhirUri(
+              'http://terminology.hl7.org/CodeSystem/observation-category',
+            ),
+            code: FhirCode('laboratory'),
+            display: 'Laboratory'.toFhirString,
+          ),
+        ],
+      ),
+    ];
 
     // Value
+    Quantity? valueQuantity;
+    FhirString? valueString;
+
     if (result.value != null) {
-      final valueQuantity = <String, dynamic>{'value': result.value};
-
-      if (result.unit != null && result.unit!.isNotEmpty) {
-        valueQuantity['unit'] = result.unit;
-        // Basic mapping to UCUM (not exhaustive but covers common ones)
-        valueQuantity['system'] = 'http://unitsofmeasure.org';
-        valueQuantity['code'] = _mapToUcum(result.unit!);
-      }
-
-      resource['valueQuantity'] = valueQuantity;
+      valueQuantity = Quantity(
+        value: FhirDecimal(result.value!),
+        unit: result.unit?.toFhirString,
+        system: result.unit != null
+            ? FhirUri('http://unitsofmeasure.org')
+            : null,
+        code: result.unit != null ? FhirCode(_mapToUcum(result.unit!)) : null,
+      );
     } else if (result.valueText != null && result.valueText!.isNotEmpty) {
-      resource['valueString'] = result.valueText;
+      valueString = result.valueText!.toFhirString;
     }
 
-    // Reference Range
+    // Reference range
+    final refRanges = <ObservationReferenceRange>[];
     if (result.refLow != null || result.refHigh != null) {
-      final refRange = <String, dynamic>{};
-
-      if (result.refLow != null) {
-        refRange['low'] = {'value': result.refLow};
-        if (result.unit != null) refRange['low']['unit'] = result.unit;
-      }
-
-      if (result.refHigh != null) {
-        refRange['high'] = {'value': result.refHigh};
-        if (result.unit != null) refRange['high']['unit'] = result.unit;
-      }
-
-      resource['referenceRange'] = [refRange];
+      refRanges.add(
+        ObservationReferenceRange(
+          low: result.refLow != null
+              ? Quantity(
+                  value: FhirDecimal(result.refLow!),
+                  unit: result.unit?.toFhirString,
+                )
+              : null,
+          high: result.refHigh != null
+              ? Quantity(
+                  value: FhirDecimal(result.refHigh!),
+                  unit: result.unit?.toFhirString,
+                )
+              : null,
+        ),
+      );
     }
 
-    // Interpretation Flag
-    final interpretationStr = _mapInterpretation(result.flag);
-    if (interpretationStr != null) {
-      resource['interpretation'] = [
-        {
-          'coding': [
-            {
-              'system':
-                  'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
-              'code': interpretationStr['code'],
-              'display': interpretationStr['display'],
-            },
-          ],
-        },
-      ];
-    }
+    // Interpretation
+    final interpretationMapping = _mapInterpretation(result.flag);
+    final interpretation = interpretationMapping != null
+        ? <CodeableConcept>[
+            CodeableConcept(
+              coding: [
+                Coding(
+                  system: FhirUri(
+                    'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation',
+                  ),
+                  code: FhirCode(interpretationMapping['code']!),
+                  display: interpretationMapping['display']!.toFhirString,
+                ),
+              ],
+            ),
+          ]
+        : null;
 
-    return resource;
+    return Observation(
+      id: obsId.toFhirString,
+      status: ObservationStatus.final_,
+      category: category,
+      code: code,
+      subject: Reference(reference: 'Patient/$patientId'.toFhirString),
+      effectiveDateTime: DateFormat(
+        'yyyy-MM-dd',
+      ).format(result.testDate).toFhirDateTime,
+      valueQuantity: valueQuantity,
+      valueString: valueString,
+      interpretation: interpretation,
+      referenceRange: refRanges.isNotEmpty ? refRanges : null,
+    );
   }
 
-  Map<String, dynamic> _buildDiagnosticReportResource({
-    required LabReport report,
+  DiagnosticReport _buildDiagnosticReport({
+    required app.LabReport report,
     required String reportId,
     required String patientId,
-    required List<Map<String, String>> observationReferences,
+    required List<Reference> observationRefs,
   }) {
-    return {
-      'resourceType': 'DiagnosticReport',
-      'id': reportId,
-      'status': 'final',
-      'category': [
-        {
-          'coding': [
-            {
-              'system': 'http://terminology.hl7.org/CodeSystem/v2-0074',
-              'code': 'LAB',
-              'display': 'Laboratory',
-            },
+    return DiagnosticReport(
+      id: reportId.toFhirString,
+      status: DiagnosticReportStatus.final_,
+      category: [
+        CodeableConcept(
+          coding: [
+            Coding(
+              system: FhirUri('http://terminology.hl7.org/CodeSystem/v2-0074'),
+              code: FhirCode('LAB'),
+              display: 'Laboratory'.toFhirString,
+            ),
           ],
-        },
+        ),
       ],
-      'code': {
-        'text': '${report.labName ?? report.originalFileName ?? "Lab"} Report',
-      },
-      'subject': {'reference': 'Patient/$patientId'},
-      'effectiveDateTime': DateFormat('yyyy-MM-dd').format(report.reportDate),
-      'result': observationReferences,
-    };
+      code: CodeableConcept(
+        text: '${report.labName ?? report.originalFileName ?? "Lab"} Report'
+            .toFhirString,
+      ),
+      subject: Reference(reference: 'Patient/$patientId'.toFhirString),
+      effectiveDateTime: DateFormat(
+        'yyyy-MM-dd',
+      ).format(report.reportDate).toFhirDateTime,
+      result: observationRefs,
+    );
   }
 
-  Map<String, String>? _mapInterpretation(BiomarkerFlag flag) {
+  // ─── Mapping Helpers ────────────────────────────────────────────────
+
+  AdministrativeGender _mapGenderEnum(String? sex) {
+    switch (sex) {
+      case 'M':
+        return AdministrativeGender.male;
+      case 'F':
+        return AdministrativeGender.female;
+      case 'O':
+        return AdministrativeGender.other;
+      default:
+        return AdministrativeGender.unknown;
+    }
+  }
+
+  Map<String, String>? _mapInterpretation(app.BiomarkerFlag flag) {
     switch (flag) {
-      case BiomarkerFlag.normal:
+      case app.BiomarkerFlag.normal:
         return {'code': 'N', 'display': 'Normal'};
-      case BiomarkerFlag.borderline:
+      case app.BiomarkerFlag.borderline:
         return {'code': 'IND', 'display': 'Indeterminate'};
-      case BiomarkerFlag.low:
+      case app.BiomarkerFlag.low:
         return {'code': 'L', 'display': 'Low'};
-      case BiomarkerFlag.high:
+      case app.BiomarkerFlag.high:
         return {'code': 'H', 'display': 'High'};
-      case BiomarkerFlag.critical:
+      case app.BiomarkerFlag.critical:
         return {'code': 'HH', 'display': 'Critically high'};
-      case BiomarkerFlag.unknown:
-        return null; // Omit if unknown
+      case app.BiomarkerFlag.unknown:
+        return null;
     }
   }
 
   String _mapToUcum(String unit) {
-    // Map common Indian lab units to UCUM codes
     switch (unit.toLowerCase()) {
       case 'mg/dl':
         return 'mg/dL';
@@ -290,7 +318,7 @@ class FhirExportService {
       case 'pg':
         return 'pg';
       default:
-        return unit; // Pass through unknown as-is
+        return unit;
     }
   }
 }
