@@ -1,34 +1,22 @@
 import 'package:flutter/material.dart';
 
+import 'screens/chat_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'screens/reports_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/objectbox_store.dart';
 import 'services/biomarker_dictionary.dart';
 import 'services/gemma_service.dart';
-import 'screens/chat_screen.dart';
-import 'screens/dashboard_screen.dart';
-import 'screens/reports_screen.dart';
 
-/// Global references — initialized in main() before runApp.
-late final ObjectBoxStore objectbox;
-late final BiomarkerDictionary biomarkerDictionary;
-late final GemmaService gemmaService;
+/// Global references — initialized in SplashScreen before navigation.
+late ObjectBoxStore objectbox;
+late BiomarkerDictionary biomarkerDictionary;
+late GemmaService gemmaService;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize ObjectBox
-  objectbox = await ObjectBoxStore.create();
-
-  // Load biomarker dictionary
-  biomarkerDictionary = BiomarkerDictionary();
-  await biomarkerDictionary.load();
-
-  // Create default patient profile
-  objectbox.getOrCreateDefaultPatient();
-
-  // Initialize Gemma service (checks if model exists on disk — never blocks)
-  gemmaService = GemmaService();
-  await gemmaService.initialize();
-
   runApp(const KoshikaApp());
 }
 
@@ -43,7 +31,11 @@ class KoshikaApp extends StatelessWidget {
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      home: const SplashScreen(),
+      routes: {
+        '/home': (_) => const HomeScreen(),
+        '/onboarding': (_) => const OnboardingScreen(),
+      },
     );
   }
 
@@ -107,6 +99,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const ReportsScreen();
       case 2:
         return const ChatScreen();
+      case 3:
+        return const SettingsScreen();
       default:
         return const DashboardScreen();
     }
@@ -136,6 +130,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.chat_outlined),
             selectedIcon: Icon(Icons.chat),
             label: 'Chat',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
