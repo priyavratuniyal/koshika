@@ -107,7 +107,13 @@ CRITICAL RULES:
   /// Download and install the model from the network.
   /// Progress is reported via [modelStatusStream].
   Future<void> downloadModel() async {
-    if (_modelInfo.status == ModelStatus.downloading) return;
+    // Guard: don't re-download if already downloaded, loaded, or in progress
+    if (_modelInfo.status == ModelStatus.downloading ||
+        _modelInfo.status == ModelStatus.ready ||
+        _modelInfo.status == ModelStatus.loaded ||
+        _modelInfo.status == ModelStatus.loading) {
+      return;
+    }
 
     _updateStatus(
       _modelInfo.copyWith(
@@ -333,6 +339,10 @@ CRITICAL RULES:
   /// Unload the model from memory. The model files stay on disk.
   Future<void> unloadModel() async {
     try {
+      // Stop any in-progress generation before unloading
+      if (_isGenerating) {
+        await stopGeneration();
+      }
       _activeChat = null;
       await _activeModel?.close();
       _activeModel = null;
@@ -407,7 +417,9 @@ CRITICAL RULES:
   /// Release all resources. Call when the app is shutting down.
   void dispose() {
     _activeChat = null;
-    _activeModel?.close();
+    final model = _activeModel;
+    _activeModel = null;
+    model?.close();
     _modelStatusController.close();
   }
 }
