@@ -55,9 +55,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ─── Chat Logic ────────────────────────────────────────────────────
 
-  void _sendMessage() {
-    final text = _textController.text.trim();
-    if (text.isEmpty) return;
+  void _sendMessage([String? overrideText]) {
+    final text = (overrideText ?? _textController.text).trim();
+    if (text.isEmpty || !mounted) return;
     if (gemmaService.isGenerating) return;
 
     _textController.clear();
@@ -127,10 +127,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _stopGeneration() async {
     _generationSubscription?.cancel();
+    _generationSubscription = null;
     await gemmaService.stopGeneration();
 
     // Finalize the last message
-    if (_messages.isNotEmpty && _messages.last.isStreaming) {
+    if (mounted && _messages.isNotEmpty && _messages.last.isStreaming) {
       setState(() {
         final last = _messages.last;
         _messages[_messages.length - 1] = last.copyWith(
@@ -259,6 +260,10 @@ class _ChatScreenState extends State<ChatScreen> {
           isGenerating: gemmaService.isGenerating,
           onSend: _sendMessage,
           onStop: _stopGeneration,
+          onSuggestionTap: (text) {
+            _textController.text = text;
+            _sendMessage(text);
+          },
         );
       case ModelStatus.error:
         return _ErrorView(modelInfo: _modelInfo, onRetry: _retryFromError);
@@ -546,6 +551,7 @@ class _ChatView extends StatelessWidget {
   final bool isGenerating;
   final VoidCallback onSend;
   final VoidCallback onStop;
+  final ValueChanged<String>? onSuggestionTap;
 
   const _ChatView({
     required this.messages,
@@ -554,6 +560,7 @@ class _ChatView extends StatelessWidget {
     required this.isGenerating,
     required this.onSend,
     required this.onStop,
+    this.onSuggestionTap,
   });
 
   @override
@@ -565,7 +572,7 @@ class _ChatView extends StatelessWidget {
         // Message list
         Expanded(
           child: messages.isEmpty
-              ? _EmptyChatView()
+              ? _EmptyChatView(onSuggestionTap: onSuggestionTap)
               : ListView.builder(
                   controller: scrollController,
                   padding: const EdgeInsets.symmetric(
@@ -656,6 +663,10 @@ class _ChatView extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════
 
 class _EmptyChatView extends StatelessWidget {
+  final ValueChanged<String>? onSuggestionTap;
+
+  const _EmptyChatView({this.onSuggestionTap});
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -689,11 +700,20 @@ class _EmptyChatView extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            _SuggestionChip(label: 'How is my thyroid?'),
+            _SuggestionChip(
+              label: 'How is my thyroid?',
+              onTap: onSuggestionTap,
+            ),
             const SizedBox(height: 8),
-            _SuggestionChip(label: 'What does my cholesterol mean?'),
+            _SuggestionChip(
+              label: 'What does my cholesterol mean?',
+              onTap: onSuggestionTap,
+            ),
             const SizedBox(height: 8),
-            _SuggestionChip(label: 'Which values are out of range?'),
+            _SuggestionChip(
+              label: 'Which values are out of range?',
+              onTap: onSuggestionTap,
+            ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -721,24 +741,28 @@ class _EmptyChatView extends StatelessWidget {
 
 class _SuggestionChip extends StatelessWidget {
   final String label;
+  final ValueChanged<String>? onTap;
 
-  const _SuggestionChip({required this.label});
+  const _SuggestionChip({required this.label, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Text(
-        '"$label"',
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.primary,
-          fontStyle: FontStyle.italic,
+    return GestureDetector(
+      onTap: () => onTap?.call(label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Text(
+          '"$label"',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.primary,
+            fontStyle: FontStyle.italic,
+          ),
         ),
       ),
     );
