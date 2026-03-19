@@ -145,6 +145,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _clearChat() {
+    _generationSubscription?.cancel();
+    _generationSubscription = null;
+    gemmaService.stopGeneration();
     setState(() {
       _messages.clear();
     });
