@@ -83,8 +83,14 @@ class BiomarkerResult {
     this.embedding,
   });
 
-  /// Convenience getter for the flag enum
-  BiomarkerFlag get flag => BiomarkerFlag.values[flagIndex];
+  /// Convenience getter for the flag enum.
+  /// Safe against corrupted [flagIndex] values from the database.
+  BiomarkerFlag get flag {
+    if (flagIndex >= 0 && flagIndex < BiomarkerFlag.values.length) {
+      return BiomarkerFlag.values[flagIndex];
+    }
+    return BiomarkerFlag.unknown;
+  }
 
   /// Convenience setter for the flag enum
   set flag(BiomarkerFlag f) => flagIndex = f.index;
@@ -141,13 +147,21 @@ class BiomarkerResult {
     }
   }
 
-  /// Format the value for display
+  /// Format the value for display with adaptive precision.
+  ///
+  /// - Whole numbers (e.g. 150) → "150"
+  /// - Very small values (e.g. 0.001) → "0.001" (up to 4 decimals)
+  /// - Sub-1 values (e.g. 0.45) → "0.450" (3 decimals)
+  /// - Large values (e.g. 15000) → "15000" (no decimals)
+  /// - Normal decimals (e.g. 5.67) → "5.67" (2 decimals)
   String get formattedValue {
     if (value != null) {
-      // Show integer if whole number, otherwise 2 decimal places
-      return value! == value!.roundToDouble()
-          ? value!.toInt().toString()
-          : value!.toStringAsFixed(2);
+      final v = value!;
+      if (v == v.roundToDouble()) return v.toInt().toString();
+      if (v.abs() < 0.01) return v.toStringAsFixed(4);
+      if (v.abs() < 1) return v.toStringAsFixed(3);
+      if (v.abs() >= 10000) return v.toStringAsFixed(0);
+      return v.toStringAsFixed(2);
     }
     return valueText ?? '--';
   }
