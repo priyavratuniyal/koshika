@@ -11,6 +11,7 @@ class DashboardSummaryCard extends StatelessWidget {
   final int criticalCount;
   final int unknownCount;
   final LabReport? lastReport;
+  final List<String> insights;
 
   const DashboardSummaryCard({
     super.key,
@@ -22,6 +23,7 @@ class DashboardSummaryCard extends StatelessWidget {
     required this.criticalCount,
     this.unknownCount = 0,
     this.lastReport,
+    this.insights = const [],
   });
 
   @override
@@ -96,6 +98,39 @@ class DashboardSummaryCard extends StatelessWidget {
                   _buildStatChip(context, 'Unknown', unknownCount, Colors.grey),
               ],
             ),
+            // ── Synthesized Insights ──
+            if (insights.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              ...insights.map(
+                (insight) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '•  ',
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          insight,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             if (lastReport != null) ...[
               const SizedBox(height: 16),
               const Divider(),

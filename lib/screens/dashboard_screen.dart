@@ -107,6 +107,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final reports = objectbox.getAllReports();
     final lastReport = reports.isNotEmpty ? reports.first : null;
 
+    // ── Generate synthesized textual insights ──
+    final insights = _buildInsights(
+      latestResults: latestResults,
+      allHistories: allHistories,
+      outOfRangeCount: outOfRangeResults.length,
+      normalCount: normalCount,
+    );
+
     return Scaffold(
       appBar: AppBar(title: const Text('Koshika')),
       body: latestResults.isEmpty
@@ -152,6 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   criticalCount: criticalCount,
                   unknownCount: unknownCount,
                   lastReport: lastReport,
+                  insights: insights,
                 ),
                 if (outOfRangeResults.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -331,5 +340,67 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
     );
+  }
+
+  /// Build human-readable insight sentences from trend and flag data.
+  List<String> _buildInsights({
+    required Map<String, BiomarkerResult> latestResults,
+    required Map<String, List<BiomarkerResult>> allHistories,
+    required int outOfRangeCount,
+    required int normalCount,
+  }) {
+    final insights = <String>[];
+
+    // Overall status
+    if (outOfRangeCount == 0 && normalCount > 0) {
+      insights.add('All biomarkers within normal range ✓');
+    } else if (outOfRangeCount > 0) {
+      insights.add(
+        '$outOfRangeCount value${outOfRangeCount == 1 ? '' : 's'} '
+        'need${outOfRangeCount == 1 ? 's' : ''} attention',
+      );
+    }
+
+    // Find trending biomarkers (those with 2+ data points and a clear direction)
+    final trendingDown = <String>[];
+    final trendingUp = <String>[];
+
+    for (final entry in allHistories.entries) {
+      if (entry.value.length < 2) continue;
+      final latest = entry.value.first;
+      final prev = entry.value[1];
+      if (latest.value == null || prev.value == null) continue;
+
+      final diff = latest.value! - prev.value!;
+      if (diff.abs() < 0.01) continue; // negligible change
+
+      final name = latest.displayName;
+      if (diff > 0) {
+        trendingUp.add(name);
+      } else {
+        trendingDown.add(name);
+      }
+    }
+
+    // Report up to 2 trending-down biomarkers (more concerning)
+    if (trendingDown.isNotEmpty) {
+      final names = trendingDown.take(2).join(', ');
+      final suffix = trendingDown.length > 2
+          ? ' and ${trendingDown.length - 2} more'
+          : '';
+      insights.add('$names trending down ↘$suffix');
+    }
+
+    // Report up to 2 trending-up biomarkers
+    if (trendingUp.isNotEmpty) {
+      final names = trendingUp.take(2).join(', ');
+      final suffix = trendingUp.length > 2
+          ? ' and ${trendingUp.length - 2} more'
+          : '';
+      insights.add('$names trending up ↗$suffix');
+    }
+
+    // Cap at 3 insights to keep the card compact
+    return insights.take(3).toList();
   }
 }
