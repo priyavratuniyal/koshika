@@ -141,6 +141,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (!mounted) return;
 
       if (importResult.success) {
+        // Index new results in VectorStore for semantic search
+        if (importResult.report != null && vectorStoreService.isReady) {
+          final newResults = objectbox.getResultsForReport(
+            importResult.report!.id,
+          );
+          vectorStoreService.indexResults(newResults);
+        }
+
         final successMessage = importResult.warnings.isEmpty
             ? 'Imported ${importResult.successfulMatches} biomarkers'
             : 'Imported ${importResult.successfulMatches} biomarkers with warnings';

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../services/objectbox_store.dart';
 import '../services/biomarker_dictionary.dart';
+import '../services/embedding_service.dart';
 import '../services/gemma_service.dart';
+import '../services/vector_store_service.dart';
 import '../main.dart' as app_main;
 import 'onboarding_screen.dart';
 
@@ -68,6 +70,15 @@ class _SplashScreenState extends State<SplashScreen>
       // Initialize Gemma service (checks if model exists on disk — never blocks)
       app_main.gemmaService = GemmaService();
       await app_main.gemmaService.initialize();
+
+      // Initialize embedding + vector store services
+      app_main.embeddingService = EmbeddingService();
+      await app_main.embeddingService.initialize();
+
+      app_main.vectorStoreService = VectorStoreService(
+        app_main.embeddingService,
+      );
+      await app_main.vectorStoreService.initialize();
 
       // Ensure animation has played for at least 1.5 seconds
       await Future.delayed(const Duration(milliseconds: 1500));

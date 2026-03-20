@@ -1,13 +1,14 @@
+import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:intl/intl.dart';
 
 import '../main.dart';
 import '../models/models.dart';
+import 'vector_store_service.dart';
 
 /// Builds context strings from the user's lab data for injection into LLM prompts.
 ///
-/// This is a keyword-based approach (Day 10 may add semantic/embedding search).
-/// The context is prepended to the user's question so the LLM can reference
-/// actual lab values instead of guessing.
+/// Uses semantic search (via VectorStore) when available, with keyword-based
+/// fallback for when the embedding model isn't loaded.
 ///
 /// A [maxContextChars] budget prevents prompt overflow on models with small
 /// context windows (e.g. Gemma 3 1B IT at 1024 tokens ≈ 4000 chars).
@@ -15,6 +16,21 @@ class ChatContextBuilder {
   /// Maximum characters allowed in the context string.
   /// ~2000 chars ≈ 500 tokens, leaving room for system prompt + user query.
   static const int maxContextChars = 2000;
+
+  final VectorStoreService? _vectorStore;
+
+  /// Retrieved documents from the last semantic search.
+  /// Used by CitationExtractor to map [N] references in the response.
+  List<RetrievalResult> lastRetrievedDocs = [];
+
+  ChatContextBuilder({VectorStoreService? vectorStore})
+    : _vectorStore = vectorStore;
+
+  /// Whether semantic search is currently available.
+  bool get isSemanticSearchActive {
+    final vs = _vectorStore;
+    return vs != null && vs.isReady;
+  }
 
   /// Keyword → category mapping for targeted context retrieval.
   static const _categoryKeywords = <String, List<String>>{
@@ -180,11 +196,56 @@ class ChatContextBuilder {
     return buffer.toString();
   }
 
-  /// Build a targeted context by matching the user's query to relevant categories.
+  /// Build context using semantic search (preferred) or keyword fallback.
   ///
-  /// If the query mentions "thyroid", only thyroid panel data is included.
-  /// If no category matches, falls back to [buildFullContext].
-  String buildQueryContext(String userQuery) {
+  /// When VectorStore is available and the embedder is loaded, performs
+  /// semantic search and returns numbered results for citation.
+  /// Otherwise, falls back to keyword-based category matching.
+  Future<String> buildQueryContext(String userQuery) async {
+    lastRetrievedDocs = [];
+
+    // Try semantic search first
+    final vs = _vectorStore;
+    if (vs != null && vs.isReady) {
+      final semanticContext = await _buildSemanticContext(userQuery);
+      if (semanticContext != null) return semanticContext;
+    }
+
+    // Fallback to keyword-based
+    return _buildKeywordContext(userQuery);
+  }
+
+  /// Semantic search → formatted context with numbered citations.
+  Future<String?> _buildSemanticContext(String query) async {
+    final results = await _vectorStore!.search(query, topK: 5);
+    if (results.isEmpty) return null;
+
+    lastRetrievedDocs = results;
+
+    final buffer = StringBuffer();
+    buffer.writeln(
+      '=== YOUR LAB DATA (${results.length} relevant results) ===',
+    );
+    buffer.writeln(
+      'Reference sources by number [1], [2], etc. in your response.',
+    );
+    buffer.writeln();
+
+    for (int i = 0; i < results.length; i++) {
+      buffer.writeln('[${i + 1}] ${results[i].content}');
+
+      if (buffer.length > maxContextChars) {
+        buffer.writeln('[Context truncated. Ask a more specific question.]');
+        break;
+      }
+    }
+
+    buffer.writeln('=== END LAB DATA ===');
+    return buffer.toString();
+  }
+
+  /// Keyword-based context matching (original Day 10 implementation).
+  String _buildKeywordContext(String userQuery) {
     // Guard: blank queries get full context
     if (userQuery.trim().isEmpty) return buildFullContext();
 

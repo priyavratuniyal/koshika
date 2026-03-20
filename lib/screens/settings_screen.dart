@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../main.dart';
 import '../models/models.dart';
+import '../services/embedding_service.dart';
 import '../services/fhir_export_service.dart';
 
 /// Settings screen with AI model management, data controls, and about section.
@@ -21,15 +22,21 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late StreamSubscription<ModelInfo> _modelSub;
+  late StreamSubscription<ModelInfo> _embeddingSub;
   late ModelInfo _modelInfo;
+  late ModelInfo _embeddingInfo;
   String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _modelInfo = gemmaService.currentModelInfo;
+    _embeddingInfo = embeddingService.currentModelInfo;
     _modelSub = gemmaService.modelStatusStream.listen((info) {
       if (mounted) setState(() => _modelInfo = info);
+    });
+    _embeddingSub = embeddingService.modelStatusStream.listen((info) {
+      if (mounted) setState(() => _embeddingInfo = info);
     });
     _loadAppVersion();
   }
@@ -48,7 +55,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _modelSub.cancel();
+    _embeddingSub.cancel();
     super.dispose();
+  }
+
+  // ─── Embedding Model ────────────────────────────────────────────────
+
+  Future<void> _downloadEmbeddingModel() async {
+    // Check if we already have a stored token
+    var token = await EmbeddingService.getHfToken();
+
+    if (token == null || token.isEmpty) {
+      // Ask user for HuggingFace token
+      if (!mounted) return;
+      token = await showDialog<String>(
+        context: context,
+        builder: (ctx) => _HfTokenDialog(),
+      );
+      if (token == null || token.isEmpty) return;
+    }
+
+    await embeddingService.downloadModel(hfToken: token);
   }
 
   // ─── Data Actions ───────────────────────────────────────────────────
@@ -167,12 +194,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         children: [
           // ── AI Model Section ──
-          _SectionHeader(title: 'AI Model', icon: Icons.smart_toy_outlined),
+          _SectionHeader(title: 'AI Models', icon: Icons.smart_toy_outlined),
           _ModelStatusTile(
             modelInfo: _modelInfo,
             onDownload: () => gemmaService.downloadModel(),
             onLoad: () => gemmaService.loadModel(),
             onUnload: () => gemmaService.unloadModel(),
+          ),
+          _EmbeddingModelTile(
+            modelInfo: _embeddingInfo,
+            onDownload: _downloadEmbeddingModel,
+            onLoad: () => embeddingService.loadModel(),
+            onUnload: () => embeddingService.unloadModel(),
           ),
 
           const Divider(height: 1),
@@ -470,5 +503,267 @@ class _ModelStatusTile extends StatelessWidget {
       case ModelStatus.error:
         return theme.colorScheme.error;
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Embedding Model Status Tile
+// ═══════════════════════════════════════════════════════════════════════
+
+class _EmbeddingModelTile extends StatelessWidget {
+  final ModelInfo modelInfo;
+  final VoidCallback onDownload;
+  final VoidCallback onLoad;
+  final VoidCallback onUnload;
+
+  const _EmbeddingModelTile({
+    required this.modelInfo,
+    required this.onDownload,
+    required this.onLoad,
+    required this.onUnload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(_statusIcon, color: _statusColor(theme), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          modelInfo.name,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Enables semantic search for AI chat',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _statusColor(theme).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _statusLabel,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: _statusColor(theme),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Size: ${modelInfo.formattedSize}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+              if (modelInfo.status == ModelStatus.downloading) ...[
+                const SizedBox(height: 12),
+                LinearProgressIndicator(
+                  value: modelInfo.downloadProgress / 100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${modelInfo.downloadProgress}%',
+                  style: theme.textTheme.labelSmall,
+                ),
+              ],
+              if (modelInfo.errorMessage != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  modelInfo.errorMessage!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (modelInfo.canDownload)
+                    FilledButton.icon(
+                      onPressed: onDownload,
+                      icon: const Icon(Icons.download, size: 18),
+                      label: const Text('Download'),
+                    ),
+                  if (modelInfo.canLoad)
+                    FilledButton.tonal(
+                      onPressed: onLoad,
+                      child: const Text('Load'),
+                    ),
+                  if (modelInfo.isUsable)
+                    OutlinedButton(
+                      onPressed: onUnload,
+                      child: const Text('Unload'),
+                    ),
+                  if (modelInfo.status == ModelStatus.downloading ||
+                      modelInfo.status == ModelStatus.loading)
+                    const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData get _statusIcon {
+    switch (modelInfo.status) {
+      case ModelStatus.notDownloaded:
+        return Icons.cloud_download_outlined;
+      case ModelStatus.downloading:
+        return Icons.downloading;
+      case ModelStatus.ready:
+        return Icons.check_circle_outline;
+      case ModelStatus.loading:
+        return Icons.hourglass_top;
+      case ModelStatus.loaded:
+        return Icons.check_circle;
+      case ModelStatus.error:
+        return Icons.error_outline;
+    }
+  }
+
+  String get _statusLabel {
+    switch (modelInfo.status) {
+      case ModelStatus.notDownloaded:
+        return 'Not Downloaded';
+      case ModelStatus.downloading:
+        return 'Downloading...';
+      case ModelStatus.ready:
+        return 'Ready';
+      case ModelStatus.loading:
+        return 'Loading...';
+      case ModelStatus.loaded:
+        return 'Active';
+      case ModelStatus.error:
+        return 'Error';
+    }
+  }
+
+  Color _statusColor(ThemeData theme) {
+    switch (modelInfo.status) {
+      case ModelStatus.notDownloaded:
+        return theme.colorScheme.outline;
+      case ModelStatus.downloading:
+      case ModelStatus.loading:
+        return Colors.amber.shade700;
+      case ModelStatus.ready:
+        return Colors.blue;
+      case ModelStatus.loaded:
+        return Colors.green;
+      case ModelStatus.error:
+        return theme.colorScheme.error;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HuggingFace Token Dialog
+// ═══════════════════════════════════════════════════════════════════════
+
+class _HfTokenDialog extends StatefulWidget {
+  @override
+  State<_HfTokenDialog> createState() => _HfTokenDialogState();
+}
+
+class _HfTokenDialogState extends State<_HfTokenDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('HuggingFace Token'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'The embedding model requires a HuggingFace token:',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '1. Create a free account at huggingface.co\n'
+            '2. Accept the model license\n'
+            '3. Get your token from Settings > Access Tokens',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            decoration: const InputDecoration(
+              labelText: 'Access Token',
+              hintText: 'hf_...',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            obscureText: true,
+            autocorrect: false,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final token = _controller.text.trim();
+            if (token.isNotEmpty) {
+              Navigator.of(context).pop(token);
+            }
+          },
+          child: const Text('Download'),
+        ),
+      ],
+    );
   }
 }

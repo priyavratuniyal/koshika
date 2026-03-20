@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:flutter_gemma/flutter_gemma.dart';
+
 import '../main.dart';
 import '../models/models.dart';
 import '../services/chat_context_builder.dart';
+import '../services/citation_extractor.dart';
 import '../widgets/chat_message_bubble.dart';
 
 /// The AI Chat screen — transforms from download/load prompt into a
@@ -28,7 +31,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _messages = <ChatMessage>[];
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
-  final _contextBuilder = ChatContextBuilder();
+  late final ChatContextBuilder _contextBuilder;
 
   StreamSubscription<ModelInfo>? _statusSubscription;
   StreamSubscription<String>? _generationSubscription;
@@ -37,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _contextBuilder = ChatContextBuilder(vectorStore: vectorStoreService);
     _statusSubscription = gemmaService.modelStatusStream.listen((info) {
       if (mounted) {
         setState(() => _modelInfo = info);
@@ -55,7 +59,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ─── Chat Logic ────────────────────────────────────────────────────
 
-  void _sendMessage([String? overrideText]) {
+  Future<void> _sendMessage([String? overrideText]) async {
     final text = (overrideText ?? _textController.text).trim();
     if (text.isEmpty || !mounted) return;
     if (gemmaService.isGenerating) return;
@@ -69,8 +73,13 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    // Build context from lab data
-    final context = _contextBuilder.buildQueryContext(text);
+    // Build context from lab data (async — may use semantic search)
+    final context = await _contextBuilder.buildQueryContext(text);
+    final retrievedDocs = List<RetrievalResult>.from(
+      _contextBuilder.lastRetrievedDocs,
+    );
+
+    if (!mounted) return;
 
     // Add placeholder assistant message (streaming)
     final assistantMsg = ChatMessage.assistantStreaming();
@@ -101,13 +110,20 @@ class _ChatScreenState extends State<ChatScreen> {
           },
           onDone: () {
             if (mounted) {
+              var finalContent = tokenBuffer.toString();
+              // Append citation footer if we have retrieved docs
+              if (finalContent.isNotEmpty && retrievedDocs.isNotEmpty) {
+                finalContent = CitationExtractor.appendSourceFooter(
+                  finalContent,
+                  retrievedDocs,
+                );
+              }
               setState(() {
                 _messages[assistantIndex] = _messages[assistantIndex].copyWith(
                   isStreaming: false,
-                  // If we got no tokens, show a fallback message
-                  content: tokenBuffer.isEmpty
+                  content: finalContent.isEmpty
                       ? 'I wasn\'t able to generate a response. Please try again.'
-                      : null,
+                      : finalContent,
                 );
               });
               _scrollToBottom();
@@ -261,6 +277,7 @@ class _ChatScreenState extends State<ChatScreen> {
           textController: _textController,
           scrollController: _scrollController,
           isGenerating: gemmaService.isGenerating,
+          isSemanticSearchActive: _contextBuilder.isSemanticSearchActive,
           onSend: _sendMessage,
           onStop: _stopGeneration,
           onSuggestionTap: (text) {
@@ -552,6 +569,7 @@ class _ChatView extends StatelessWidget {
   final TextEditingController textController;
   final ScrollController scrollController;
   final bool isGenerating;
+  final bool isSemanticSearchActive;
   final VoidCallback onSend;
   final VoidCallback onStop;
   final ValueChanged<String>? onSuggestionTap;
@@ -561,6 +579,7 @@ class _ChatView extends StatelessWidget {
     required this.textController,
     required this.scrollController,
     required this.isGenerating,
+    this.isSemanticSearchActive = false,
     required this.onSend,
     required this.onStop,
     this.onSuggestionTap,
@@ -572,6 +591,39 @@ class _ChatView extends StatelessWidget {
 
     return Column(
       children: [
+        // Search mode indicator
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isSemanticSearchActive ? Icons.auto_awesome : Icons.text_fields,
+                size: 14,
+                color: isSemanticSearchActive
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                isSemanticSearchActive
+                    ? 'Semantic search active'
+                    : 'Keyword search (basic)',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: isSemanticSearchActive
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Message list
         Expanded(
           child: messages.isEmpty

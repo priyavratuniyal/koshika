@@ -8,12 +8,16 @@ import 'screens/settings_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/objectbox_store.dart';
 import 'services/biomarker_dictionary.dart';
+import 'services/embedding_service.dart';
 import 'services/gemma_service.dart';
+import 'services/vector_store_service.dart';
 
 /// Global references — initialized in SplashScreen before navigation.
 late ObjectBoxStore objectbox;
 late BiomarkerDictionary biomarkerDictionary;
 late GemmaService gemmaService;
+late EmbeddingService embeddingService;
+late VectorStoreService vectorStoreService;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
