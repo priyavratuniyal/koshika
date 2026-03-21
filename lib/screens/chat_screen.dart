@@ -27,11 +27,16 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
+enum _SessionSheetAction { newChat }
+
 class _ChatScreenState extends State<ChatScreen> {
   final _messages = <ChatMessage>[];
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   late final ChatContextBuilder _contextBuilder;
+  ChatSession? _currentSession;
+  bool _hasShownPersistenceWarning = false;
+  bool _hasLoggedUnknownRoleIndex = false;
 
   StreamSubscription<ModelInfo>? _statusSubscription;
   StreamSubscription<String>? _generationSubscription;
@@ -41,6 +46,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _contextBuilder = ChatContextBuilder(vectorStore: vectorStoreService);
+    _loadMostRecentSession();
     _statusSubscription = gemmaService.modelStatusStream.listen((info) {
       if (mounted) {
         setState(() => _modelInfo = info);
@@ -57,6 +63,208 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  void _loadMostRecentSession() {
+    try {
+      final sessions = objectbox.getAllSessions();
+      if (sessions.isEmpty) return;
+
+      final session = sessions.first;
+      final persisted = objectbox.getMessagesForSession(session.id);
+      _currentSession = session;
+      _messages.addAll(
+        persisted.map(
+          (m) => ChatMessage(
+            id: 'db-${m.id}',
+            content: m.content,
+            role: _roleFromIndex(m.roleIndex),
+            timestamp: m.timestamp,
+            isStreaming: false,
+            isError: m.isError,
+          ),
+        ),
+      );
+    } catch (e, st) {
+      _logStorageError('load most recent session', e, st);
+    }
+  }
+
+  ChatRole _roleFromIndex(int index) {
+    if (index >= 0 && index < ChatRole.values.length) {
+      return ChatRole.values[index];
+    }
+    if (!_hasLoggedUnknownRoleIndex) {
+      _hasLoggedUnknownRoleIndex = true;
+      debugPrint(
+        'Chat persistence warning: unknown roleIndex=$index. '
+        'Falling back to assistant role.',
+      );
+    }
+    return ChatRole.assistant;
+  }
+
+  ChatSession? _ensureCurrentSession(String firstMessage) {
+    final existing = _currentSession;
+    if (existing != null) return existing;
+    try {
+      final created = objectbox.createSession(firstMessage);
+      _currentSession = created;
+      return created;
+    } catch (e, st) {
+      _reportStorageError('create chat session', e, st);
+      return null;
+    }
+  }
+
+  void _logStorageError(String action, Object error, [StackTrace? st]) {
+    debugPrint('Chat persistence error during $action: $error');
+    if (st != null) {
+      debugPrint(st.toString());
+    }
+  }
+
+  void _reportStorageError(String action, Object error, [StackTrace? st]) {
+    _logStorageError(action, error, st);
+    if (!mounted || _hasShownPersistenceWarning) return;
+    _hasShownPersistenceWarning = true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Could not save chat history for one or more messages.'),
+      ),
+    );
+  }
+
+  bool _persistMessage(ChatSession session, ChatMessage message) {
+    try {
+      objectbox.saveMessage(
+        session,
+        PersistedChatMessage(
+          content: message.content,
+          roleIndex: message.role.index,
+          timestamp: message.timestamp,
+          isError: message.isError,
+        ),
+      );
+      return true;
+    } catch (e, st) {
+      _reportStorageError('save chat message', e, st);
+      return false;
+    }
+  }
+
+  Future<void> _openSessionSheet() async {
+    if (!mounted) return;
+    List<ChatSession> sessions;
+    try {
+      sessions = objectbox.getAllSessions();
+    } catch (e, st) {
+      _reportStorageError('open session list', e, st);
+      return;
+    }
+
+    final result = await showModalBottomSheet<Object>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final currentId = _currentSession?.id;
+
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.55,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.add_comment_outlined),
+                  title: const Text('New chat'),
+                  onTap: () =>
+                      Navigator.of(context).pop(_SessionSheetAction.newChat),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: sessions.isEmpty
+                      ? const Center(child: Text('No previous conversations'))
+                      : ListView.builder(
+                          itemCount: sessions.length,
+                          itemBuilder: (context, index) {
+                            final session = sessions[index];
+                            final isCurrent = session.id == currentId;
+                            return ListTile(
+                              leading: Icon(
+                                isCurrent
+                                    ? Icons.chat_bubble
+                                    : Icons.chat_bubble_outline,
+                              ),
+                              title: Text(
+                                session.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                'Updated ${session.lastMessageAt.day}/${session.lastMessageAt.month}/${session.lastMessageAt.year}',
+                              ),
+                              trailing: isCurrent
+                                  ? Icon(
+                                      Icons.check,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    )
+                                  : null,
+                              onTap: () => Navigator.of(context).pop(session),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+    if (result == _SessionSheetAction.newChat) {
+      _startNewChat();
+      return;
+    }
+    if (result is ChatSession) {
+      await _loadSession(result);
+    }
+  }
+
+  Future<void> _loadSession(ChatSession session) async {
+    _generationSubscription?.cancel();
+    _generationSubscription = null;
+    await gemmaService.stopGeneration();
+
+    List<PersistedChatMessage> persisted;
+    try {
+      persisted = objectbox.getMessagesForSession(session.id);
+    } catch (e, st) {
+      _reportStorageError('load selected session', e, st);
+      return;
+    }
+    if (!mounted) return;
+
+    setState(() {
+      _currentSession = session;
+      _messages
+        ..clear()
+        ..addAll(
+          persisted.map(
+            (m) => ChatMessage(
+              id: 'db-${m.id}',
+              content: m.content,
+              role: _roleFromIndex(m.roleIndex),
+              timestamp: m.timestamp,
+              isStreaming: false,
+              isError: m.isError,
+            ),
+          ),
+        );
+    });
+    _scrollToBottom();
+  }
+
   // ─── Chat Logic ────────────────────────────────────────────────────
 
   Future<void> _sendMessage([String? overrideText]) async {
@@ -65,12 +273,16 @@ class _ChatScreenState extends State<ChatScreen> {
     if (gemmaService.isGenerating) return;
 
     _textController.clear();
+    final activeSession = _ensureCurrentSession(text);
 
     // Add user message
     final userMsg = ChatMessage.user(text);
     setState(() {
       _messages.add(userMsg);
     });
+    if (activeSession != null) {
+      _persistMessage(activeSession, userMsg);
+    }
     _scrollToBottom();
 
     // Build context from lab data (async — may use semantic search)
@@ -91,6 +303,14 @@ class _ChatScreenState extends State<ChatScreen> {
     // Start streaming generation
     final assistantIndex = _messages.length - 1;
     final tokenBuffer = StringBuffer();
+    var assistantPersistAttempted = false;
+
+    void persistAssistantOnce() {
+      final session = activeSession;
+      if (session == null || assistantPersistAttempted) return;
+      assistantPersistAttempted = true;
+      _persistMessage(session, _messages[assistantIndex]);
+    }
 
     _generationSubscription?.cancel();
     _generationSubscription = gemmaService
@@ -126,6 +346,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       : finalContent,
                 );
               });
+              persistAssistantOnce();
               _scrollToBottom();
             }
           },
@@ -136,6 +357,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   'An error occurred during generation: $e',
                 );
               });
+              persistAssistantOnce();
             }
           },
         );
@@ -157,14 +379,19 @@ class _ChatScreenState extends State<ChatScreen> {
               : '${last.content}\n\n[Generation stopped]',
         );
       });
+      final session = _currentSession;
+      if (session != null) {
+        _persistMessage(session, _messages.last);
+      }
     }
   }
 
-  void _clearChat() {
+  void _startNewChat() {
     _generationSubscription?.cancel();
     _generationSubscription = null;
     gemmaService.stopGeneration();
     setState(() {
+      _currentSession = null;
       _messages.clear();
     });
   }
@@ -214,26 +441,32 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Chat'),
+        title: Text(_currentSession?.title ?? 'AI Chat'),
         actions: [
+          IconButton(
+            onPressed: gemmaService.isGenerating ? null : _openSessionSheet,
+            tooltip: 'Conversations',
+            icon: const Icon(Icons.history),
+          ),
           if (_modelInfo.status == ModelStatus.loaded)
             PopupMenuButton<String>(
               onSelected: (value) {
-                switch (value) {
-                  case 'clear':
-                    _clearChat();
-                  case 'unload':
-                    _unloadModel();
+                if (value == 'new') {
+                  _startNewChat();
+                  return;
+                }
+                if (value == 'unload') {
+                  _unloadModel();
                 }
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(
-                  value: 'clear',
+                  value: 'new',
                   child: Row(
                     children: [
-                      Icon(Icons.clear_all, size: 20),
+                      Icon(Icons.add_comment_outlined, size: 20),
                       SizedBox(width: 8),
-                      Text('Clear Chat'),
+                      Text('New Chat'),
                     ],
                   ),
                 ),

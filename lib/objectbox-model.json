@@ -194,10 +194,81 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "4:542975154161431803",
+      "lastPropertyId": "4:4126270972844958425",
+      "name": "ChatSession",
+      "properties": [
+        {
+          "id": "1:3079507420252501277",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:7755307406885512726",
+          "name": "title",
+          "type": 9
+        },
+        {
+          "id": "3:1585498312990007282",
+          "name": "createdAt",
+          "type": 10
+        },
+        {
+          "id": "4:4126270972844958425",
+          "name": "lastMessageAt",
+          "type": 10
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "5:1397208082251365964",
+      "lastPropertyId": "6:5450536964930078917",
+      "name": "PersistedChatMessage",
+      "properties": [
+        {
+          "id": "1:2957032474519806104",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:4019668193248367598",
+          "name": "sessionId",
+          "indexId": "5:2477129363995053950",
+          "type": 11,
+          "flags": 520,
+          "relationTarget": "ChatSession"
+        },
+        {
+          "id": "3:6374967230335097998",
+          "name": "content",
+          "type": 9
+        },
+        {
+          "id": "4:2972012503306002202",
+          "name": "roleIndex",
+          "type": 6
+        },
+        {
+          "id": "5:2296869470696146310",
+          "name": "timestamp",
+          "type": 10
+        },
+        {
+          "id": "6:5450536964930078917",
+          "name": "isError",
+          "type": 1
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "3:3215559289155237862",
-  "lastIndexId": "4:2507639558608191303",
+  "lastEntityId": "5:1397208082251365964",
+  "lastIndexId": "5:2477129363995053950",
   "lastRelationId": "0:0",
   "lastSequenceId": "0:0",
   "modelVersion": 5,

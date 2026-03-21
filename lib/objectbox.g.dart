@@ -15,6 +15,7 @@ import 'package:objectbox/objectbox.dart' as obx;
 import 'package:objectbox_flutter_libs/objectbox_flutter_libs.dart';
 
 import 'models/biomarker_result.dart';
+import 'models/chat_session.dart';
 import 'models/lab_report.dart';
 import 'models/patient.dart';
 
@@ -245,6 +246,89 @@ final _entities = <obx_int.ModelEntity>[
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[],
   ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(4, 542975154161431803),
+    name: 'ChatSession',
+    lastPropertyId: const obx_int.IdUid(4, 4126270972844958425),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 3079507420252501277),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 7755307406885512726),
+        name: 'title',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 1585498312990007282),
+        name: 'createdAt',
+        type: 10,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 4126270972844958425),
+        name: 'lastMessageAt',
+        type: 10,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(5, 1397208082251365964),
+    name: 'PersistedChatMessage',
+    lastPropertyId: const obx_int.IdUid(6, 5450536964930078917),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 2957032474519806104),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 4019668193248367598),
+        name: 'sessionId',
+        type: 11,
+        flags: 520,
+        indexId: const obx_int.IdUid(5, 2477129363995053950),
+        relationField: 'session',
+        relationTarget: 'ChatSession',
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 6374967230335097998),
+        name: 'content',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 2972012503306002202),
+        name: 'roleIndex',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 2296869470696146310),
+        name: 'timestamp',
+        type: 10,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 5450536964930078917),
+        name: 'isError',
+        type: 1,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
 ];
 
 /// Shortcut for [obx.Store.new] that passes [getObjectBoxModel] and for Flutter
@@ -290,8 +374,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
     // Typically, this is done with `dart run build_runner build`.
     generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
-    lastEntityId: const obx_int.IdUid(3, 3215559289155237862),
-    lastIndexId: const obx_int.IdUid(4, 2507639558608191303),
+    lastEntityId: const obx_int.IdUid(5, 1397208082251365964),
+    lastIndexId: const obx_int.IdUid(5, 2477129363995053950),
     lastRelationId: const obx_int.IdUid(0, 0),
     lastSequenceId: const obx_int.IdUid(0, 0),
     retiredEntityUids: const [],
@@ -596,6 +680,116 @@ obx_int.ModelDefinition getObjectBoxModel() {
         return object;
       },
     ),
+    ChatSession: obx_int.EntityDefinition<ChatSession>(
+      model: _entities[3],
+      toOneRelations: (ChatSession object) => [],
+      toManyRelations: (ChatSession object) => {},
+      getId: (ChatSession object) => object.id,
+      setId: (ChatSession object, int id) {
+        object.id = id;
+      },
+      objectToFB: (ChatSession object, fb.Builder fbb) {
+        final titleOffset = fbb.writeString(object.title);
+        fbb.startTable(5);
+        fbb.addInt64(0, object.id);
+        fbb.addOffset(1, titleOffset);
+        fbb.addInt64(2, object.createdAt.millisecondsSinceEpoch);
+        fbb.addInt64(3, object.lastMessageAt.millisecondsSinceEpoch);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final titleParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 6, '');
+        final createdAtParam = DateTime.fromMillisecondsSinceEpoch(
+          const fb.Int64Reader().vTableGet(buffer, rootOffset, 8, 0),
+        );
+        final lastMessageAtParam = DateTime.fromMillisecondsSinceEpoch(
+          const fb.Int64Reader().vTableGet(buffer, rootOffset, 10, 0),
+        );
+        final object = ChatSession(
+          id: idParam,
+          title: titleParam,
+          createdAt: createdAtParam,
+          lastMessageAt: lastMessageAtParam,
+        );
+
+        return object;
+      },
+    ),
+    PersistedChatMessage: obx_int.EntityDefinition<PersistedChatMessage>(
+      model: _entities[4],
+      toOneRelations: (PersistedChatMessage object) => [object.session],
+      toManyRelations: (PersistedChatMessage object) => {},
+      getId: (PersistedChatMessage object) => object.id,
+      setId: (PersistedChatMessage object, int id) {
+        object.id = id;
+      },
+      objectToFB: (PersistedChatMessage object, fb.Builder fbb) {
+        final contentOffset = fbb.writeString(object.content);
+        fbb.startTable(7);
+        fbb.addInt64(0, object.id);
+        fbb.addInt64(1, object.session.targetId);
+        fbb.addOffset(2, contentOffset);
+        fbb.addInt64(3, object.roleIndex);
+        fbb.addInt64(4, object.timestamp.millisecondsSinceEpoch);
+        fbb.addBool(5, object.isError);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final contentParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 8, '');
+        final roleIndexParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          10,
+          0,
+        );
+        final timestampParam = DateTime.fromMillisecondsSinceEpoch(
+          const fb.Int64Reader().vTableGet(buffer, rootOffset, 12, 0),
+        );
+        final isErrorParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          14,
+          false,
+        );
+        final object = PersistedChatMessage(
+          id: idParam,
+          content: contentParam,
+          roleIndex: roleIndexParam,
+          timestamp: timestampParam,
+          isError: isErrorParam,
+        );
+        object.session.targetId = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          6,
+          0,
+        );
+        object.session.attach(store);
+        return object;
+      },
+    ),
   };
 
   return obx_int.ModelDefinition(model, bindings);
@@ -762,5 +956,62 @@ class Patient_ {
   /// See [Patient.createdAt].
   static final createdAt = obx.QueryDateProperty<Patient>(
     _entities[2].properties[4],
+  );
+}
+
+/// [ChatSession] entity fields to define ObjectBox queries.
+class ChatSession_ {
+  /// See [ChatSession.id].
+  static final id = obx.QueryIntegerProperty<ChatSession>(
+    _entities[3].properties[0],
+  );
+
+  /// See [ChatSession.title].
+  static final title = obx.QueryStringProperty<ChatSession>(
+    _entities[3].properties[1],
+  );
+
+  /// See [ChatSession.createdAt].
+  static final createdAt = obx.QueryDateProperty<ChatSession>(
+    _entities[3].properties[2],
+  );
+
+  /// See [ChatSession.lastMessageAt].
+  static final lastMessageAt = obx.QueryDateProperty<ChatSession>(
+    _entities[3].properties[3],
+  );
+}
+
+/// [PersistedChatMessage] entity fields to define ObjectBox queries.
+class PersistedChatMessage_ {
+  /// See [PersistedChatMessage.id].
+  static final id = obx.QueryIntegerProperty<PersistedChatMessage>(
+    _entities[4].properties[0],
+  );
+
+  /// See [PersistedChatMessage.session].
+  static final session =
+      obx.QueryRelationToOne<PersistedChatMessage, ChatSession>(
+        _entities[4].properties[1],
+      );
+
+  /// See [PersistedChatMessage.content].
+  static final content = obx.QueryStringProperty<PersistedChatMessage>(
+    _entities[4].properties[2],
+  );
+
+  /// See [PersistedChatMessage.roleIndex].
+  static final roleIndex = obx.QueryIntegerProperty<PersistedChatMessage>(
+    _entities[4].properties[3],
+  );
+
+  /// See [PersistedChatMessage.timestamp].
+  static final timestamp = obx.QueryDateProperty<PersistedChatMessage>(
+    _entities[4].properties[4],
+  );
+
+  /// See [PersistedChatMessage.isError].
+  static final isError = obx.QueryBooleanProperty<PersistedChatMessage>(
+    _entities[4].properties[5],
   );
 }

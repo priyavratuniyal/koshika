@@ -11,11 +11,15 @@ class ObjectBoxStore {
   late final Box<Patient> patientBox;
   late final Box<LabReport> labReportBox;
   late final Box<BiomarkerResult> biomarkerResultBox;
+  late final Box<ChatSession> chatSessionBox;
+  late final Box<PersistedChatMessage> persistedChatMessageBox;
 
   ObjectBoxStore._create(this.store) {
     patientBox = Box<Patient>(store);
     labReportBox = Box<LabReport>(store);
     biomarkerResultBox = Box<BiomarkerResult>(store);
+    chatSessionBox = Box<ChatSession>(store);
+    persistedChatMessageBox = Box<PersistedChatMessage>(store);
   }
 
   /// Initialize the ObjectBox store. Call once during app startup.
@@ -47,6 +51,68 @@ class ObjectBoxStore {
     final results = built.find();
     built.close();
     return results;
+  }
+
+  /// Get all chat sessions, ordered by recent activity (newest first).
+  List<ChatSession> getAllSessions() {
+    final query = chatSessionBox.query()
+      ..order(ChatSession_.lastMessageAt, flags: Order.descending);
+    final built = query.build();
+    final sessions = built.find();
+    built.close();
+    return sessions;
+  }
+
+  /// Get all messages for a chat session, ordered by timestamp (oldest first).
+  List<PersistedChatMessage> getMessagesForSession(int sessionId) {
+    final query = persistedChatMessageBox.query(
+      PersistedChatMessage_.session.equals(sessionId),
+    )..order(PersistedChatMessage_.timestamp);
+    final built = query.build();
+    final messages = built.find();
+    built.close();
+    return messages;
+  }
+
+  /// Create a new chat session titled from the first message.
+  ChatSession createSession(String firstMessage) {
+    final trimmed = firstMessage.trim();
+    final title = trimmed.isEmpty
+        ? 'New Chat'
+        : (trimmed.length <= 50
+              ? trimmed
+              : '${trimmed.substring(0, 50).trimRight()}...');
+    final now = DateTime.now();
+    final session = ChatSession(
+      title: title,
+      createdAt: now,
+      lastMessageAt: now,
+    );
+    chatSessionBox.put(session);
+    return session;
+  }
+
+  /// Save a chat message and update the session activity timestamp.
+  void saveMessage(ChatSession session, PersistedChatMessage message) {
+    store.runInTransaction(TxMode.write, () {
+      message.session.target = session;
+      persistedChatMessageBox.put(message);
+
+      session.lastMessageAt = message.timestamp;
+      chatSessionBox.put(session);
+    });
+  }
+
+  /// Delete a chat session and all of its messages.
+  void deleteSession(int sessionId) {
+    store.runInTransaction(TxMode.write, () {
+      final query = persistedChatMessageBox
+          .query(PersistedChatMessage_.session.equals(sessionId))
+          .build();
+      query.remove();
+      query.close();
+      chatSessionBox.remove(sessionId);
+    });
   }
 
   /// Get all biomarker results for a specific report
