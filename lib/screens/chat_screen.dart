@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models/models.dart';
 import '../services/chat_context_builder.dart';
 import '../services/citation_extractor.dart';
+import '../services/embedding_service.dart';
 import '../widgets/chat_message_bubble.dart';
 
 /// The AI Chat screen — transforms from download/load prompt into a
@@ -411,7 +412,9 @@ class _ChatScreenState extends State<ChatScreen> {
   // ─── Model Actions ─────────────────────────────────────────────────
 
   Future<void> _downloadModel() async {
-    await gemmaService.downloadModel();
+    final token = await _getOrPromptHfToken();
+    if (token == null || token.isEmpty) return;
+    await gemmaService.downloadModel(hfToken: token);
   }
 
   void _cancelDownload() {
@@ -433,6 +436,67 @@ class _ChatScreenState extends State<ChatScreen> {
     } else if (_modelInfo.canLoad) {
       await _loadModel();
     }
+  }
+
+  Future<String?> _getOrPromptHfToken() async {
+    var token = await EmbeddingService.getHfToken();
+    if (token != null && token.isNotEmpty) return token;
+    if (!mounted) return null;
+
+    final controller = TextEditingController();
+    token = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hugging Face Token'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'The chat model is gated on Hugging Face and needs a token with '
+              'read access.',
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Grant access to litert-community/Gemma3-1B-IT, create a Read '
+              'token, then paste it here.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Access Token',
+                hintText: 'hf_...',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              obscureText: true,
+              autocorrect: false,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (value.isNotEmpty) {
+                Navigator.of(context).pop(value);
+              }
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (token == null || token.isEmpty) return null;
+    await EmbeddingService.saveHfToken(token);
+    return token;
   }
 
   // ─── Build ─────────────────────────────────────────────────────────

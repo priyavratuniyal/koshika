@@ -62,20 +62,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ─── Embedding Model ────────────────────────────────────────────────
 
   Future<void> _downloadEmbeddingModel() async {
-    // Check if we already have a stored token
+    final token = await _getOrPromptHfToken();
+    if (token == null || token.isEmpty) return;
+    await embeddingService.downloadModel(hfToken: token);
+  }
+
+  Future<void> _downloadGemmaModel() async {
+    final token = await _getOrPromptHfToken();
+    if (token == null || token.isEmpty) return;
+    await gemmaService.downloadModel(hfToken: token);
+  }
+
+  Future<String?> _getOrPromptHfToken() async {
     var token = await EmbeddingService.getHfToken();
 
     if (token == null || token.isEmpty) {
-      // Ask user for HuggingFace token
-      if (!mounted) return;
+      if (!mounted) return null;
       token = await showDialog<String>(
         context: context,
         builder: (ctx) => _HfTokenDialog(),
       );
-      if (token == null || token.isEmpty) return;
+      if (token == null || token.isEmpty) return null;
+      await EmbeddingService.saveHfToken(token);
     }
 
-    await embeddingService.downloadModel(hfToken: token);
+    return token;
   }
 
   // ─── Data Actions ───────────────────────────────────────────────────
@@ -197,7 +208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SectionHeader(title: 'AI Models', icon: Icons.smart_toy_outlined),
           _ModelStatusTile(
             modelInfo: _modelInfo,
-            onDownload: () => gemmaService.downloadModel(),
+            onDownload: _downloadGemmaModel,
             onLoad: () => gemmaService.loadModel(),
             onUnload: () => gemmaService.unloadModel(),
           ),
@@ -721,14 +732,18 @@ class _HfTokenDialogState extends State<_HfTokenDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'The embedding model requires a HuggingFace token:',
+            'Koshika downloads gated Hugging Face models, so you need a token '
+            'with access to both repos:',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 8),
           Text(
             '1. Create a free account at huggingface.co\n'
-            '2. Accept the model license\n'
-            '3. Get your token from Settings > Access Tokens',
+            '2. Request/accept access for:\n'
+            '   - litert-community/embeddinggemma-300m\n'
+            '   - litert-community/Gemma3-1B-IT\n'
+            '3. Create a Read token in Settings > Access Tokens\n'
+            '4. Paste that token here',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(
                 context,

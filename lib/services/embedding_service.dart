@@ -21,18 +21,18 @@ class EmbeddingService {
 
   static const String _modelName = 'EmbeddingGemma 300M';
 
-  /// 4-bit quantized variant — 75MB download, 768-dim output.
-  /// Smallest variant that still produces high-quality embeddings.
+  /// LiteRT EmbeddingGemma model hosted by litert-community on Hugging Face.
+  /// This generic seq1024 build is the current public TFLite distribution.
   static const String _modelUrl =
-      'https://huggingface.co/google/embeddinggemma-300m-4bit/resolve/main/model.tflite';
+      'https://huggingface.co/litert-community/embeddinggemma-300m/resolve/main/embeddinggemma-300M_seq1024_mixed-precision.tflite';
   static const String _tokenizerUrl =
-      'https://huggingface.co/google/embeddinggemma-300m-4bit/resolve/main/sentencepiece.model';
+      'https://huggingface.co/litert-community/embeddinggemma-300m/resolve/main/sentencepiece.model';
 
   /// iOS needs a JSON tokenizer (sentencepiece.model conflicts with TFLite on iOS).
   static const String _iosTokenizerUrl =
       'https://github.com/nicholasgasior/embeddinggemma-tokenizer/releases/download/v1/tokenizer.json';
 
-  static const int _estimatedSizeMB = 75;
+  static const int _estimatedSizeMB = 183;
   static const String _hfTokenKey = 'koshika_hf_token';
 
   // ─── State ─────────────────────────────────────────────────────────
@@ -64,8 +64,10 @@ class EmbeddingService {
 
   Future<void> initialize() async {
     try {
-      final hasEmbedder = FlutterGemma.hasActiveEmbedder();
-      if (hasEmbedder) {
+      final isInstalled = await FlutterGemma.isModelInstalled(
+        _modelUrlToFilename(_modelUrl),
+      );
+      if (isInstalled) {
         _updateStatus(
           _modelInfo.copyWith(status: ModelStatus.ready, downloadProgress: 100),
         );
@@ -128,6 +130,15 @@ class EmbeddingService {
             );
           })
           .install();
+
+      final isInstalled = await FlutterGemma.isModelInstalled(
+        _modelUrlToFilename(_modelUrl),
+      );
+      if (!isInstalled) {
+        throw StateError(
+          'Embedding model download finished without installing a usable model file.',
+        );
+      }
 
       _downloadCancelToken = null;
 
@@ -246,6 +257,11 @@ class EmbeddingService {
     }
   }
 
+  String _modelUrlToFilename(String url) {
+    final uri = Uri.parse(url);
+    return uri.pathSegments.isNotEmpty ? uri.pathSegments.last : url;
+  }
+
   String _classifyDownloadError(dynamic error) {
     final msg = error.toString().toLowerCase();
     if (msg.contains('socket') || msg.contains('connection')) {
@@ -257,7 +273,9 @@ class EmbeddingService {
     if (msg.contains('401') ||
         msg.contains('403') ||
         msg.contains('forbidden')) {
-      return 'Access denied. Check your HuggingFace token and model access.';
+      return 'Access denied. Your Hugging Face account needs access to '
+          'litert-community/embeddinggemma-300m, and your token must have '
+          'read permission.';
     }
     if (msg.contains('404') || msg.contains('not found')) {
       return 'Model not found at the download URL.';
