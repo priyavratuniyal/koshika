@@ -9,9 +9,11 @@ import 'package:share_plus/share_plus.dart';
 
 import '../main.dart';
 import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 import '../models/models.dart';
 import '../services/embedding_service.dart';
 import '../services/fhir_export_service.dart';
+import '../widgets/icon_container.dart';
 
 /// Settings screen with AI model management, data controls, and about section.
 class SettingsScreen extends StatefulWidget {
@@ -204,6 +206,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: KoshikaSpacing.base),
         children: [
           // ── AI Model Section ──
           _SectionHeader(title: 'AI Models', icon: Icons.smart_toy_outlined),
@@ -220,87 +223,96 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onUnload: () => embeddingService.unloadModel(),
           ),
 
-          const Divider(height: 1),
+          const SizedBox(height: KoshikaSpacing.sm),
 
           // ── Data Section ──
           _SectionHeader(
             title: 'Data Management',
             icon: Icons.storage_outlined,
           ),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Reports imported'),
+          _SettingsRow(
+            icon: Icons.description_outlined,
+            iconColor: AppColors.primary,
+            title: 'Reports imported',
             trailing: Text(
               '${reports.length}',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
+              style: KoshikaTypography.statusText.copyWith(
+                color: AppColors.primary,
               ),
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.biotech_outlined),
-            title: const Text('Biomarkers tracked'),
+          _SettingsRow(
+            icon: Icons.biotech_outlined,
+            iconColor: AppColors.primary,
+            title: 'Biomarkers tracked',
             trailing: Text(
               '$biomarkerCount',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
+              style: KoshikaTypography.statusText.copyWith(
+                color: AppColors.primary,
               ),
             ),
           ),
-          ListTile(
-            leading: Icon(Icons.ios_share, color: theme.colorScheme.primary),
-            title: const Text('Export All Data (FHIR R4)'),
-            subtitle: const Text('Share as interoperable health bundle'),
+          _SettingsRow(
+            icon: Icons.ios_share,
+            iconColor: AppColors.primary,
+            title: 'Export All Data (FHIR R4)',
+            subtitle: 'Share as interoperable health bundle',
             onTap: _exportAllFhir,
           ),
-          ListTile(
-            leading: Icon(Icons.delete_forever, color: theme.colorScheme.error),
-            title: Text(
-              'Delete All Data',
-              style: TextStyle(color: theme.colorScheme.error),
-            ),
-            subtitle: const Text('Remove all reports and biomarkers'),
+          _SettingsRow(
+            icon: Icons.delete_forever,
+            iconColor: AppColors.error,
+            title: 'Delete All Data',
+            titleColor: AppColors.error,
+            subtitle: 'Remove all reports and biomarkers',
             onTap: _deleteAllData,
           ),
 
-          const Divider(height: 1),
+          const SizedBox(height: KoshikaSpacing.sm),
 
           // ── About Section ──
           _SectionHeader(title: 'About', icon: Icons.info_outline),
-          ListTile(
-            leading: const Icon(Icons.local_hospital),
-            title: const Text('Koshika — कोशिका'),
-            subtitle: const Text(
-              'Offline-first health data tracker with on-device AI',
-            ),
+          _SettingsRow(
+            icon: Icons.local_hospital,
+            iconColor: AppColors.primary,
+            title: 'Koshika',
+            subtitle: 'Offline-first health data tracker with on-device AI',
           ),
-          ListTile(
-            leading: const Icon(Icons.tag),
-            title: const Text('Version'),
+          _SettingsRow(
+            icon: Icons.tag,
+            iconColor: AppColors.onSurfaceVariant,
+            title: 'Version',
             trailing: Text(
               _appVersion.isEmpty ? '...' : _appVersion,
-              style: theme.textTheme.bodyMedium,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.code),
-            title: const Text('Source Code'),
-            subtitle: const Text('github.com/priyavratuniyal/koshika'),
+          _SettingsRow(
+            icon: Icons.code,
+            iconColor: AppColors.onSurfaceVariant,
+            title: 'Source Code',
+            subtitle: 'github.com/priyavratuniyal/koshika',
           ),
-          ListTile(
-            leading: const Icon(Icons.balance),
-            title: const Text('License'),
-            trailing: Text('Apache 2.0', style: theme.textTheme.bodyMedium),
+          _SettingsRow(
+            icon: Icons.balance,
+            iconColor: AppColors.onSurfaceVariant,
+            title: 'License',
+            trailing: Text(
+              'Apache 2.0',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
           ),
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(KoshikaSpacing.xl),
             child: Text(
-              'Built for FOSS Hack 2026 🇮🇳',
+              'Built for FOSS Hack 2026',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                color: AppColors.textMuted,
               ),
             ),
           ),
@@ -322,22 +334,96 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.fromLTRB(
+        0,
+        KoshikaSpacing.xl,
+        0,
+        KoshikaSpacing.sm,
+      ),
       child: Row(
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
-          const SizedBox(width: 8),
+          const SizedBox(width: KoshikaSpacing.sm),
           Text(
             title.toUpperCase(),
-            style: theme.textTheme.labelMedium?.copyWith(
+            style: KoshikaTypography.metricLabel.copyWith(
               color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Settings Row (replaces ListTile)
+// ═══════════════════════════════════════════════════════════════════════
+
+class _SettingsRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final Color? titleColor;
+  final String? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _SettingsRow({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    this.titleColor,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: KoshikaSpacing.base,
+          vertical: KoshikaSpacing.md,
+        ),
+        margin: const EdgeInsets.only(bottom: KoshikaSpacing.xs),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: KoshikaRadius.lg,
+        ),
+        child: Row(
+          children: [
+            IconContainer(icon: icon, color: iconColor),
+            const SizedBox(width: KoshikaSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: titleColor ?? AppColors.onSurface,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (trailing != null) trailing!,
+          ],
+        ),
       ),
     );
   }
@@ -363,159 +449,135 @@ class _ModelStatusTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final statusColor = _statusColor;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(_statusIcon, color: _statusColor(theme), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      modelInfo.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+      padding: const EdgeInsets.only(bottom: KoshikaSpacing.sm),
+      child: Container(
+        decoration: KoshikaDecorations.card,
+        padding: KoshikaSpacing.cardPaddingAsymmetric,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(_statusIcon, color: statusColor, size: 20),
+                const SizedBox(width: KoshikaSpacing.sm),
+                Expanded(
+                  child: Text(
+                    modelInfo.name,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.onSurface,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusColor(theme).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _statusLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: _statusColor(theme),
-                        fontWeight: FontWeight.w600,
-                      ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: KoshikaSpacing.sm,
+                    vertical: KoshikaSpacing.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: KoshikaRadius.md,
+                  ),
+                  child: Text(
+                    _statusLabel,
+                    style: KoshikaTypography.statusText.copyWith(
+                      color: statusColor,
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: KoshikaSpacing.sm),
+            Text(
+              'Size: ${modelInfo.formattedSize}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
               ),
-              const SizedBox(height: 8),
+            ),
+            if (modelInfo.status == ModelStatus.downloading) ...[
+              const SizedBox(height: KoshikaSpacing.md),
+              LinearProgressIndicator(
+                value: modelInfo.downloadProgress / 100,
+                borderRadius: KoshikaRadius.sm,
+              ),
+              const SizedBox(height: KoshikaSpacing.xs),
               Text(
-                'Size: ${modelInfo.formattedSize}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-              if (modelInfo.status == ModelStatus.downloading) ...[
-                const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: modelInfo.downloadProgress / 100,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${modelInfo.downloadProgress}%',
-                  style: theme.textTheme.labelSmall,
-                ),
-              ],
-              if (modelInfo.errorMessage != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  modelInfo.errorMessage!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (modelInfo.canDownload)
-                    FilledButton.icon(
-                      onPressed: onDownload,
-                      icon: const Icon(Icons.download, size: 18),
-                      label: const Text('Download'),
-                    ),
-                  if (modelInfo.canLoad)
-                    FilledButton.tonal(
-                      onPressed: onLoad,
-                      child: const Text('Load Model'),
-                    ),
-                  if (modelInfo.isUsable)
-                    OutlinedButton(
-                      onPressed: onUnload,
-                      child: const Text('Unload'),
-                    ),
-                  if (modelInfo.status == ModelStatus.downloading ||
-                      modelInfo.status == ModelStatus.loading)
-                    const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                ],
+                '${modelInfo.downloadProgress}%',
+                style: theme.textTheme.labelSmall,
               ),
             ],
-          ),
+            if (modelInfo.errorMessage != null) ...[
+              const SizedBox(height: KoshikaSpacing.sm),
+              Text(
+                modelInfo.errorMessage!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+            const SizedBox(height: KoshikaSpacing.md),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (modelInfo.canDownload)
+                  FilledButton.icon(
+                    onPressed: onDownload,
+                    icon: const Icon(Icons.download, size: 18),
+                    label: const Text('Download'),
+                  ),
+                if (modelInfo.canLoad)
+                  FilledButton.tonal(
+                    onPressed: onLoad,
+                    child: const Text('Load Model'),
+                  ),
+                if (modelInfo.isUsable)
+                  OutlinedButton(
+                    onPressed: onUnload,
+                    child: const Text('Unload'),
+                  ),
+                if (modelInfo.status == ModelStatus.downloading ||
+                    modelInfo.status == ModelStatus.loading)
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  IconData get _statusIcon {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return Icons.cloud_download_outlined;
-      case ModelStatus.downloading:
-        return Icons.downloading;
-      case ModelStatus.ready:
-        return Icons.check_circle_outline;
-      case ModelStatus.loading:
-        return Icons.hourglass_top;
-      case ModelStatus.loaded:
-        return Icons.check_circle;
-      case ModelStatus.error:
-        return Icons.error_outline;
-    }
-  }
+  IconData get _statusIcon => switch (modelInfo.status) {
+    ModelStatus.notDownloaded => Icons.cloud_download_outlined,
+    ModelStatus.downloading => Icons.downloading,
+    ModelStatus.ready => Icons.check_circle_outline,
+    ModelStatus.loading => Icons.hourglass_top,
+    ModelStatus.loaded => Icons.check_circle,
+    ModelStatus.error => Icons.error_outline,
+  };
 
-  String get _statusLabel {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return 'Not Downloaded';
-      case ModelStatus.downloading:
-        return 'Downloading...';
-      case ModelStatus.ready:
-        return 'Ready';
-      case ModelStatus.loading:
-        return 'Loading...';
-      case ModelStatus.loaded:
-        return 'Active';
-      case ModelStatus.error:
-        return 'Error';
-    }
-  }
+  String get _statusLabel => switch (modelInfo.status) {
+    ModelStatus.notDownloaded => 'Not Downloaded',
+    ModelStatus.downloading => 'Downloading...',
+    ModelStatus.ready => 'Ready',
+    ModelStatus.loading => 'Loading...',
+    ModelStatus.loaded => 'Active',
+    ModelStatus.error => 'Error',
+  };
 
-  Color _statusColor(ThemeData theme) {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return AppColors.onSurfaceVariant;
-      case ModelStatus.downloading:
-      case ModelStatus.loading:
-        return AppColors.statusBusy;
-      case ModelStatus.ready:
-        return AppColors.statusReady;
-      case ModelStatus.loaded:
-        return AppColors.statusActive;
-      case ModelStatus.error:
-        return AppColors.error;
-    }
-  }
+  Color get _statusColor => switch (modelInfo.status) {
+    ModelStatus.notDownloaded => AppColors.onSurfaceVariant,
+    ModelStatus.downloading || ModelStatus.loading => AppColors.statusBusy,
+    ModelStatus.ready => AppColors.statusReady,
+    ModelStatus.loaded => AppColors.statusActive,
+    ModelStatus.error => AppColors.error,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -538,172 +600,146 @@ class _EmbeddingModelTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final statusColor = _statusColor;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(_statusIcon, color: _statusColor(theme), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          modelInfo.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+      padding: const EdgeInsets.only(bottom: KoshikaSpacing.sm),
+      child: Container(
+        decoration: KoshikaDecorations.card,
+        padding: KoshikaSpacing.cardPaddingAsymmetric,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(_statusIcon, color: statusColor, size: 20),
+                const SizedBox(width: KoshikaSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        modelInfo.name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.onSurface,
                         ),
-                        Text(
-                          'Enables semantic search for AI chat',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusColor(theme).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _statusLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: _statusColor(theme),
-                        fontWeight: FontWeight.w600,
                       ),
+                      Text(
+                        'Enables semantic search for AI chat',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: KoshikaSpacing.sm,
+                    vertical: KoshikaSpacing.xs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: KoshikaRadius.md,
+                  ),
+                  child: Text(
+                    _statusLabel,
+                    style: KoshikaTypography.statusText.copyWith(
+                      color: statusColor,
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: KoshikaSpacing.sm),
+            Text(
+              'Size: ${modelInfo.formattedSize}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
               ),
-              const SizedBox(height: 8),
+            ),
+            if (modelInfo.status == ModelStatus.downloading) ...[
+              const SizedBox(height: KoshikaSpacing.md),
+              LinearProgressIndicator(
+                value: modelInfo.downloadProgress / 100,
+                borderRadius: KoshikaRadius.sm,
+              ),
+              const SizedBox(height: KoshikaSpacing.xs),
               Text(
-                'Size: ${modelInfo.formattedSize}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-              if (modelInfo.status == ModelStatus.downloading) ...[
-                const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: modelInfo.downloadProgress / 100,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${modelInfo.downloadProgress}%',
-                  style: theme.textTheme.labelSmall,
-                ),
-              ],
-              if (modelInfo.errorMessage != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  modelInfo.errorMessage!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (modelInfo.canDownload)
-                    FilledButton.icon(
-                      onPressed: onDownload,
-                      icon: const Icon(Icons.download, size: 18),
-                      label: const Text('Download'),
-                    ),
-                  if (modelInfo.canLoad)
-                    FilledButton.tonal(
-                      onPressed: onLoad,
-                      child: const Text('Load'),
-                    ),
-                  if (modelInfo.isUsable)
-                    OutlinedButton(
-                      onPressed: onUnload,
-                      child: const Text('Unload'),
-                    ),
-                  if (modelInfo.status == ModelStatus.downloading ||
-                      modelInfo.status == ModelStatus.loading)
-                    const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                ],
+                '${modelInfo.downloadProgress}%',
+                style: theme.textTheme.labelSmall,
               ),
             ],
-          ),
+            if (modelInfo.errorMessage != null) ...[
+              const SizedBox(height: KoshikaSpacing.sm),
+              Text(
+                modelInfo.errorMessage!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+            const SizedBox(height: KoshikaSpacing.md),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (modelInfo.canDownload)
+                  FilledButton.icon(
+                    onPressed: onDownload,
+                    icon: const Icon(Icons.download, size: 18),
+                    label: const Text('Download'),
+                  ),
+                if (modelInfo.canLoad)
+                  FilledButton.tonal(
+                    onPressed: onLoad,
+                    child: const Text('Load'),
+                  ),
+                if (modelInfo.isUsable)
+                  OutlinedButton(
+                    onPressed: onUnload,
+                    child: const Text('Unload'),
+                  ),
+                if (modelInfo.status == ModelStatus.downloading ||
+                    modelInfo.status == ModelStatus.loading)
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  IconData get _statusIcon {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return Icons.cloud_download_outlined;
-      case ModelStatus.downloading:
-        return Icons.downloading;
-      case ModelStatus.ready:
-        return Icons.check_circle_outline;
-      case ModelStatus.loading:
-        return Icons.hourglass_top;
-      case ModelStatus.loaded:
-        return Icons.check_circle;
-      case ModelStatus.error:
-        return Icons.error_outline;
-    }
-  }
+  IconData get _statusIcon => switch (modelInfo.status) {
+    ModelStatus.notDownloaded => Icons.cloud_download_outlined,
+    ModelStatus.downloading => Icons.downloading,
+    ModelStatus.ready => Icons.check_circle_outline,
+    ModelStatus.loading => Icons.hourglass_top,
+    ModelStatus.loaded => Icons.check_circle,
+    ModelStatus.error => Icons.error_outline,
+  };
 
-  String get _statusLabel {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return 'Not Downloaded';
-      case ModelStatus.downloading:
-        return 'Downloading...';
-      case ModelStatus.ready:
-        return 'Ready';
-      case ModelStatus.loading:
-        return 'Loading...';
-      case ModelStatus.loaded:
-        return 'Active';
-      case ModelStatus.error:
-        return 'Error';
-    }
-  }
+  String get _statusLabel => switch (modelInfo.status) {
+    ModelStatus.notDownloaded => 'Not Downloaded',
+    ModelStatus.downloading => 'Downloading...',
+    ModelStatus.ready => 'Ready',
+    ModelStatus.loading => 'Loading...',
+    ModelStatus.loaded => 'Active',
+    ModelStatus.error => 'Error',
+  };
 
-  Color _statusColor(ThemeData theme) {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return AppColors.onSurfaceVariant;
-      case ModelStatus.downloading:
-      case ModelStatus.loading:
-        return AppColors.statusBusy;
-      case ModelStatus.ready:
-        return AppColors.statusReady;
-      case ModelStatus.loaded:
-        return AppColors.statusActive;
-      case ModelStatus.error:
-        return AppColors.error;
-    }
-  }
+  Color get _statusColor => switch (modelInfo.status) {
+    ModelStatus.notDownloaded => AppColors.onSurfaceVariant,
+    ModelStatus.downloading || ModelStatus.loading => AppColors.statusBusy,
+    ModelStatus.ready => AppColors.statusReady,
+    ModelStatus.loaded => AppColors.statusActive,
+    ModelStatus.error => AppColors.error,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
