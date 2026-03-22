@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 
@@ -139,34 +141,136 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       body: _buildCurrentScreen(),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() => _currentIndex = index);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+      bottomNavigationBar: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: KoshikaSpacing.sm,
+                  vertical: KoshikaSpacing.xs,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _NavItem(
+                      index: 0,
+                      currentIndex: _currentIndex,
+                      icon: Icons.dashboard_outlined,
+                      activeIcon: Icons.dashboard,
+                      label: 'Dashboard',
+                      onTap: () => setState(() => _currentIndex = 0),
+                    ),
+                    _NavItem(
+                      index: 1,
+                      currentIndex: _currentIndex,
+                      icon: Icons.description_outlined,
+                      activeIcon: Icons.description,
+                      label: 'Reports',
+                      onTap: () => setState(() => _currentIndex = 1),
+                    ),
+                    _NavItem(
+                      index: 2,
+                      currentIndex: _currentIndex,
+                      icon: Icons.chat_outlined,
+                      activeIcon: Icons.chat,
+                      label: 'Chat',
+                      onTap: () => setState(() => _currentIndex = 2),
+                    ),
+                    _NavItem(
+                      index: 3,
+                      currentIndex: _currentIndex,
+                      icon: Icons.settings_outlined,
+                      activeIcon: Icons.settings,
+                      label: 'Settings',
+                      onTap: () => setState(() => _currentIndex = 3),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.description_outlined),
-            selectedIcon: Icon(Icons.description),
-            label: 'Reports',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_outlined),
-            selectedIcon: Icon(Icons.chat),
-            label: 'Chat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final int index;
+  final int currentIndex;
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.index,
+    required this.currentIndex,
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected = index == currentIndex;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.symmetric(
+                horizontal: KoshikaSpacing.base,
+                vertical: KoshikaSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primaryContainer.withValues(alpha: 0.3)
+                    : Colors.transparent,
+                borderRadius: KoshikaRadius.pill,
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: Icon(
+                  isSelected ? activeIcon : icon,
+                  key: ValueKey(isSelected),
+                  size: 24,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.onSurfaceVariant,
+              ),
+              child: Text(label),
+            ),
+          ],
+        ),
       ),
     );
   }
