@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_gemma/flutter_gemma.dart';
 
+import '../constants/ai_prompts.dart';
 import '../models/model_info.dart';
+import '../utils/error_classifier.dart';
 
 /// Service managing the on-device Gemma LLM lifecycle.
 ///
@@ -17,30 +19,17 @@ import '../models/model_info.dart';
 class GemmaService {
   // ─── Model Configuration ───────────────────────────────────────────
 
-  /// Gemma-3 1B IT (instruction-tuned), GPU int8, MediaPipe .task format.
-  /// This is a public model from litert-community — no HuggingFace token needed.
+  /// Gemma-3 1B IT (instruction-tuned), int4 MediaPipe .task format.
+  /// This Hugging Face-hosted model is gated and requires a token with access.
   static const String _modelName = 'Gemma 3 1B';
   static const String _modelUrl =
-      'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int8.task';
-  static const int _estimatedSizeMB = 1200;
+      'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task';
+  static const int _estimatedSizeMB = 555;
   static const int _maxTokens = 1024;
 
-  // ─── Health System Prompt ──────────────────────────────────────────
-
-  static const String systemPrompt = '''
-You are Koshika AI, a helpful on-device health assistant built into the Koshika app. You help users understand their lab report results.
-
-CRITICAL RULES:
-- You are NOT a doctor. Always remind users to consult a healthcare professional for medical decisions.
-- Reference the user's actual lab data when it is provided in context.
-- Reference specific values from the data using source numbers [1], [2], etc. when available.
-- Explain biomarker values in simple, clear language a non-medical person can understand.
-- Flag concerning values but avoid causing unnecessary panic.
-- Suggest lifestyle factors that can influence results when appropriate.
-- Be concise — aim for 3-5 sentences per response.
-- Use Indian medical terminology when relevant (SGPT/ALT, TLC/WBC, etc.).
-- If no lab data is provided, inform the user they need to import a lab report first.
-''';
+  // ─── System Prompt ────────────────────────────────────────────────
+  // Sourced from AiPrompts so it can be reviewed/iterated in one place.
+  static String get systemPrompt => AiPrompts.gemmaSystemPrompt;
 
   // ─── State ─────────────────────────────────────────────────────────
 
@@ -107,7 +96,7 @@ CRITICAL RULES:
 
   /// Download and install the model from the network.
   /// Progress is reported via [modelStatusStream].
-  Future<void> downloadModel() async {
+  Future<void> downloadModel({String? hfToken}) async {
     // Guard: don't re-download if already downloaded, loaded, or in progress
     if (_modelInfo.status == ModelStatus.downloading ||
         _modelInfo.status == ModelStatus.ready ||
@@ -128,7 +117,7 @@ CRITICAL RULES:
 
     try {
       await FlutterGemma.installModel(modelType: ModelType.gemmaIt)
-          .fromNetwork(_modelUrl)
+          .fromNetwork(_modelUrl, token: hfToken)
           .withCancelToken(_downloadCancelToken!)
           .withProgress((progress) {
             _updateStatus(
@@ -139,6 +128,15 @@ CRITICAL RULES:
             );
           })
           .install();
+
+      final isInstalled = await FlutterGemma.isModelInstalled(
+        _modelUrlToFilename(_modelUrl),
+      );
+      if (!isInstalled) {
+        throw StateError(
+          'Gemma model download finished without installing a usable model file.',
+        );
+      }
 
       _downloadCancelToken = null;
 
@@ -279,22 +277,25 @@ CRITICAL RULES:
       final chat = await _activeModel!.createChat();
       _activeChat = chat;
 
-      // Build system context message
-      final systemContext = StringBuffer(systemPrompt);
+      // Add system prompt
+      await chat.addQueryChunk(Message.systemInfo(text: systemPrompt));
+
+      // Build user turn: prepend lab data so the model sees it directly
+      // in the query rather than only in the system message, which small
+      // models (1B) tend to under-utilise.
+      final userTurn = StringBuffer();
       if (context != null && context.isNotEmpty) {
-        systemContext.writeln();
-        systemContext.writeln('=== USER\'S LAB DATA ===');
-        systemContext.writeln(context);
-        systemContext.writeln('=== END LAB DATA ===');
+        userTurn.writeln('My lab data:');
+        userTurn.writeln(context);
+        userTurn.writeln();
+        userTurn.write('Question: $userMessage');
+      } else {
+        userTurn.write(userMessage);
       }
 
-      // Add system info message with health context
       await chat.addQueryChunk(
-        Message.systemInfo(text: systemContext.toString()),
+        Message.text(text: userTurn.toString(), isUser: true),
       );
-
-      // Add user message
-      await chat.addQueryChunk(Message.text(text: userMessage, isUser: true));
 
       // Generate streaming response
       final responseStream = chat.generateChatResponseAsync();
@@ -374,46 +375,10 @@ CRITICAL RULES:
     return uri.pathSegments.isNotEmpty ? uri.pathSegments.last : url;
   }
 
-  String _classifyDownloadError(dynamic error) {
-    final msg = error.toString().toLowerCase();
-    if (msg.contains('socket') || msg.contains('connection')) {
-      return 'Network error. Please check your internet connection and try again.';
-    }
-    if (msg.contains('storage') ||
-        msg.contains('space') ||
-        msg.contains('no space')) {
-      return 'Insufficient storage. The model requires ~${_estimatedSizeMB}MB of free space.';
-    }
-    if (msg.contains('timeout')) {
-      return 'Download timed out. Please try again on a stable connection.';
-    }
-    if (msg.contains('403') || msg.contains('forbidden')) {
-      return 'Access denied. This model may require a HuggingFace token.';
-    }
-    if (msg.contains('404') || msg.contains('not found')) {
-      return 'Model file not found at the download URL. It may have been moved or removed.';
-    }
-    return 'Download failed: ${error.toString().length > 100 ? '${error.toString().substring(0, 100)}...' : error}';
-  }
+  String _classifyDownloadError(dynamic error) =>
+      ErrorClassifier.download(error, estimatedSizeMB: _estimatedSizeMB);
 
-  String _classifyLoadError(dynamic error) {
-    final msg = error.toString().toLowerCase();
-    if (msg.contains('memory') ||
-        msg.contains('oom') ||
-        msg.contains('out of memory')) {
-      return 'Not enough RAM to load this model. '
-          'Try closing other apps and restarting Koshika.';
-    }
-    if (msg.contains('corrupt') || msg.contains('invalid')) {
-      return 'Model file appears corrupted. '
-          'Please delete the model and re-download it.';
-    }
-    if (msg.contains('gpu') || msg.contains('delegate')) {
-      return 'GPU and CPU inference both failed on this device. '
-          'The model may not be compatible with your hardware.';
-    }
-    return 'Failed to load model: ${error.toString().length > 100 ? '${error.toString().substring(0, 100)}...' : error}';
-  }
+  String _classifyLoadError(dynamic error) => ErrorClassifier.load(error);
 
   /// Release all resources. Call when the app is shutting down.
   void dispose() {

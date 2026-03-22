@@ -5,6 +5,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/model_info.dart';
+import '../utils/error_classifier.dart';
 
 /// Service managing the on-device EmbeddingGemma model lifecycle.
 ///
@@ -262,26 +263,8 @@ class EmbeddingService {
     return uri.pathSegments.isNotEmpty ? uri.pathSegments.last : url;
   }
 
-  String _classifyDownloadError(dynamic error) {
-    final msg = error.toString().toLowerCase();
-    if (msg.contains('socket') || msg.contains('connection')) {
-      return 'Network error. Check your internet connection.';
-    }
-    if (msg.contains('storage') || msg.contains('space')) {
-      return 'Insufficient storage. The model requires ~${_estimatedSizeMB}MB.';
-    }
-    if (msg.contains('401') ||
-        msg.contains('403') ||
-        msg.contains('forbidden')) {
-      return 'Access denied. Your Hugging Face account needs access to '
-          'litert-community/embeddinggemma-300m, and your token must have '
-          'read permission.';
-    }
-    if (msg.contains('404') || msg.contains('not found')) {
-      return 'Model not found at the download URL.';
-    }
-    return 'Download failed: ${error.toString().length > 100 ? '${error.toString().substring(0, 100)}...' : error}';
-  }
+  String _classifyDownloadError(dynamic error) =>
+      ErrorClassifier.download(error, estimatedSizeMB: _estimatedSizeMB);
 
   void dispose() {
     _embedder?.close();
