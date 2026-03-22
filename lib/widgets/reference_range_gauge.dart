@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 class ReferenceRangeGauge extends StatelessWidget {
   final double? value;
   final double? refLow;
@@ -31,35 +33,39 @@ class ReferenceRangeGauge extends StatelessWidget {
                 value: value!,
                 refLow: refLow,
                 refHigh: refHigh,
-                theme: Theme.of(context),
               ),
             ),
           ),
-          // Adding small labels below the gauge for context (optional, but requested in plan)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (refLow != null)
                 Text(
-                  'Low',
+                  'LOW',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontSize: 10,
-                    color: Colors.orange,
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
                   ),
                 ),
               Text(
-                'Normal',
+                'NORMAL',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontSize: 10,
-                  color: Colors.green,
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
                 ),
               ),
               if (refHigh != null)
                 Text(
-                  'High',
+                  'HIGH',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontSize: 10,
-                    color: Colors.red,
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
                   ),
                 ),
             ],
@@ -74,26 +80,17 @@ class _GaugePainter extends CustomPainter {
   final double value;
   final double? refLow;
   final double? refHigh;
-  final ThemeData theme;
 
-  _GaugePainter({
-    required this.value,
-    this.refLow,
-    this.refHigh,
-    required this.theme,
-  });
+  _GaugePainter({required this.value, this.refLow, this.refHigh});
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Use actual bounds for display range; only synthesize for display padding
     final effectiveLow = refLow ?? 0.0;
     final effectiveHigh = refHigh ?? (refLow != null ? refLow! * 2.0 : 100.0);
 
-    // Calculate display range to ensure everything fits (pad by 20%)
     double displayMin = min(value, effectiveLow);
     double displayMax = max(value, effectiveHigh);
 
-    // Add 20% padding to display bounds, except don't go below 0 if all values are positive
     final rangePad = (displayMax - displayMin) * 0.2;
     displayMin = displayMin - rangePad;
     displayMax = displayMax + rangePad;
@@ -115,15 +112,14 @@ class _GaugePainter extends CustomPainter {
 
     final paint = Paint()..style = PaintingStyle.fill;
     final radius = const Radius.circular(6);
-    final isDark = theme.brightness == Brightness.dark;
 
-    final lowColor = Colors.orange.withValues(alpha: isDark ? 0.6 : 0.3);
-    final normalColor = Colors.green.withValues(alpha: isDark ? 0.6 : 0.3);
-    final highColor = Colors.red.withValues(alpha: isDark ? 0.6 : 0.3);
+    // Light mode only — use consistent alpha
+    final lowColor = AppColors.warning.withValues(alpha: 0.3);
+    final normalColor = AppColors.success.withValues(alpha: 0.3);
+    final highColor = AppColors.error.withValues(alpha: 0.3);
 
     // Draw the background bar based on available reference limits
     if (refLow != null && refHigh != null) {
-      // 3 zones (Low, Normal, High)
       // Low Zone
       paint.color = lowColor;
       canvas.drawRRect(
@@ -148,7 +144,6 @@ class _GaugePainter extends CustomPainter {
         paint,
       );
     } else if (refLow != null) {
-      // 2 zones (Low, Normal)
       paint.color = lowColor;
       canvas.drawRRect(
         RRect.fromRectAndCorners(
@@ -168,7 +163,6 @@ class _GaugePainter extends CustomPainter {
         paint,
       );
     } else if (refHigh != null) {
-      // 2 zones (Normal, High)
       paint.color = normalColor;
       canvas.drawRRect(
         RRect.fromRectAndCorners(
@@ -191,7 +185,7 @@ class _GaugePainter extends CustomPainter {
 
     // Draw reference limit ticks
     final limitTickPaint = Paint()
-      ..color = theme.colorScheme.onSurface.withValues(alpha: 0.5)
+      ..color = AppColors.onSurface.withValues(alpha: 0.5)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
 
@@ -205,12 +199,11 @@ class _GaugePainter extends CustomPainter {
     // Draw current value marker
     final valX = xPos(value).clamp(4.0, width - 4.0);
 
-    // Check if it's out of bounds and we clamped it heavily (unlikely due to displayMin/Max scaling, but safe)
     bool outOfBoundsRight = value > displayMax;
     bool outOfBoundsLeft = value < displayMin;
 
     final markerPaint = Paint()
-      ..color = theme.colorScheme.onSurface
+      ..color = AppColors.onSurface
       ..style = PaintingStyle.fill;
 
     // Triangle marker pointing down
@@ -236,7 +229,7 @@ class _GaugePainter extends CustomPainter {
     }
 
     final tickPaint = Paint()
-      ..color = theme.colorScheme.onSurface
+      ..color = AppColors.onSurface
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
@@ -251,7 +244,6 @@ class _GaugePainter extends CustomPainter {
   bool shouldRepaint(covariant _GaugePainter oldDelegate) {
     return oldDelegate.value != value ||
         oldDelegate.refLow != refLow ||
-        oldDelegate.refHigh != refHigh ||
-        oldDelegate.theme != theme;
+        oldDelegate.refHigh != refHigh;
   }
 }
