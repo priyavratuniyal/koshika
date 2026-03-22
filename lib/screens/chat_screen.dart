@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
@@ -10,6 +11,7 @@ import '../services/chat_context_builder.dart';
 import '../services/citation_extractor.dart';
 import '../services/embedding_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 import '../widgets/chat_message_bubble.dart';
 
 /// The AI Chat screen — transforms from download/load prompt into a
@@ -180,7 +182,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   onTap: () =>
                       Navigator.of(context).pop(_SessionSheetAction.newChat),
                 ),
-                const Divider(height: 1),
+                const SizedBox(height: KoshikaSpacing.xs),
                 Expanded(
                   child: sessions.isEmpty
                       ? const Center(child: Text('No previous conversations'))
@@ -605,7 +607,7 @@ class _NotDownloadedView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -622,15 +624,14 @@ class _NotDownloadedView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             Text(
               'AI Assistant',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             Text(
               'Download the ${modelInfo.name} model to chat about your health data privately on this device.',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -638,13 +639,15 @@ class _NotDownloadedView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: KoshikaSpacing.base,
+                vertical: KoshikaSpacing.md,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.outlineVariant),
+                borderRadius: KoshikaRadius.lg,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -654,20 +657,20 @@ class _NotDownloadedView extends StatelessWidget {
                     size: 16,
                     color: AppColors.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: KoshikaSpacing.sm),
                   Text(
                     'Download size: ~${modelInfo.formattedSize}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: KoshikaSpacing.base),
                   const Icon(
                     Icons.wifi,
                     size: 16,
                     color: AppColors.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: KoshikaSpacing.xs),
                   Text(
                     'Wi-Fi recommended',
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -677,10 +680,9 @@ class _NotDownloadedView extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             FilledButton.icon(
               onPressed: onDownload,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               icon: const Icon(Icons.download),
               label: const Text('Download AI Model'),
             ),
@@ -708,7 +710,7 @@ class _DownloadingView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -725,21 +727,21 @@ class _DownloadingView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             Text(
               'Downloading ${modelInfo.name}',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
+                fontSize: 20,
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             SizedBox(
               width: 280,
               child: Column(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: KoshikaRadius.md,
                     child: LinearProgressIndicator(
                       value: progress > 0 ? progress / 100.0 : null,
                       minHeight: 8,
@@ -749,7 +751,7 @@ class _DownloadingView extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: KoshikaSpacing.sm),
                   Text(
                     progress > 0
                         ? '$progress% downloaded'
@@ -761,20 +763,16 @@ class _DownloadingView extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             Text(
               'Please keep the app open',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             OutlinedButton.icon(
               onPressed: onCancel,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.outlineVariant),
-              ),
               icon: const Icon(Icons.close, size: 18),
               label: const Text('Cancel'),
             ),
@@ -800,7 +798,7 @@ class _ReadyView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -817,15 +815,14 @@ class _ReadyView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             Text(
               'AI Model Ready',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             Text(
               'The model is downloaded. Load it into memory to start chatting about your health data.',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -833,10 +830,9 @@ class _ReadyView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             FilledButton.icon(
               onPressed: onLoad,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text('Load Model'),
             ),
@@ -860,7 +856,7 @@ class _LoadingView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -872,15 +868,15 @@ class _LoadingView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             Text(
               'Loading AI Model...',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
+                fontSize: 20,
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             Text(
               'This may take a few seconds depending on your device.',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -929,7 +925,10 @@ class _ChatView extends StatelessWidget {
         // Search mode indicator
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: KoshikaSpacing.base,
+            vertical: 6,
+          ),
           color: isSemanticSearchActive
               ? AppColors.primaryContainer.withValues(alpha: 0.12)
               : AppColors.surfaceContainerHigh.withValues(alpha: 0.6),
@@ -944,7 +943,7 @@ class _ChatView extends StatelessWidget {
                     ? AppColors.primary
                     : AppColors.onSurfaceVariant.withValues(alpha: 0.6),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: KoshikaSpacing.xs),
               Text(
                 isSemanticSearchActive
                     ? 'Semantic search active'
@@ -966,8 +965,8 @@ class _ChatView extends StatelessWidget {
               : ListView.builder(
                   controller: scrollController,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                    horizontal: KoshikaSpacing.base,
+                    vertical: KoshikaSpacing.sm,
                   ),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
@@ -976,84 +975,120 @@ class _ChatView extends StatelessWidget {
                 ),
         ),
 
-        // Input bar
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
+        // Glassmorphic input bar
+        ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.85),
               ),
-            ],
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-          child: SafeArea(
-            top: false,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Text input
-                Expanded(
-                  child: TextField(
-                    controller: textController,
-                    maxLines: 5,
-                    minLines: 1,
-                    enabled: !isGenerating,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      hintText: 'Ask about your health data...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.surfaceContainerLow,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                    onSubmitted: (_) => onSend(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // Send / Stop button
-                if (isGenerating)
-                  IconButton.filledTonal(
-                    onPressed: onStop,
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.primaryContainer.withValues(
-                        alpha: 0.2,
-                      ),
-                      foregroundColor: AppColors.primary,
-                    ),
-                    icon: const Icon(Icons.stop_rounded),
-                    tooltip: 'Stop generation',
-                  )
-                else
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: textController,
-                    builder: (context, value, _) {
-                      final hasText = value.text.trim().isNotEmpty;
-                      return IconButton.filled(
-                        onPressed: hasText ? onSend : null,
-                        style: IconButton.styleFrom(
-                          backgroundColor: hasText
-                              ? AppColors.primary
-                              : AppColors.surfaceContainerHigh,
-                          foregroundColor: hasText
-                              ? Colors.white
-                              : AppColors.onSurfaceVariant,
+              padding: const EdgeInsets.fromLTRB(
+                KoshikaSpacing.base,
+                KoshikaSpacing.sm,
+                KoshikaSpacing.sm,
+                KoshikaSpacing.xs,
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Text input
+                        Expanded(
+                          child: TextField(
+                            controller: textController,
+                            maxLines: 5,
+                            minLines: 1,
+                            enabled: !isGenerating,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: InputDecoration(
+                              hintText: 'Ask about your health data...',
+                              border: OutlineInputBorder(
+                                borderRadius: KoshikaRadius.xxl,
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.surfaceContainerLow,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: KoshikaSpacing.lg,
+                                vertical: KoshikaSpacing.md,
+                              ),
+                            ),
+                            onSubmitted: (_) => onSend(),
+                          ),
                         ),
-                        icon: const Icon(Icons.send_rounded),
-                        tooltip: 'Send message',
-                      );
-                    },
-                  ),
-              ],
+                        const SizedBox(width: KoshikaSpacing.sm),
+
+                        // Send / Stop button
+                        if (isGenerating)
+                          IconButton.filledTonal(
+                            onPressed: onStop,
+                            style: IconButton.styleFrom(
+                              backgroundColor: AppColors.primaryContainer
+                                  .withValues(alpha: 0.2),
+                              foregroundColor: AppColors.primary,
+                            ),
+                            icon: const Icon(Icons.stop_rounded),
+                            tooltip: 'Stop generation',
+                          )
+                        else
+                          ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: textController,
+                            builder: (context, value, _) {
+                              final hasText = value.text.trim().isNotEmpty;
+                              return IconButton.filled(
+                                onPressed: hasText ? onSend : null,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: hasText
+                                      ? AppColors.primary
+                                      : AppColors.surfaceContainerHigh,
+                                  foregroundColor: hasText
+                                      ? Colors.white
+                                      : AppColors.onSurfaceVariant,
+                                ),
+                                icon: const Icon(Icons.send_rounded),
+                                tooltip: 'Send message',
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                    // Privacy label
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        top: KoshikaSpacing.xs,
+                        bottom: KoshikaSpacing.xs,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.lock_outline,
+                            size: 11,
+                            color: AppColors.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            'All processing happens on your device',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.onSurfaceVariant.withValues(
+                                alpha: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -1077,7 +1112,7 @@ class _EmptyChatView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1094,15 +1129,15 @@ class _EmptyChatView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             Text(
               'Ask about your health data',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
+                fontSize: 18,
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             Text(
               'Your lab data is automatically included as context. '
               'Try asking:',
@@ -1111,38 +1146,20 @@ class _EmptyChatView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             _SuggestionChip(
               label: 'How is my thyroid?',
               onTap: onSuggestionTap,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             _SuggestionChip(
               label: 'What does my cholesterol mean?',
               onTap: onSuggestionTap,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             _SuggestionChip(
               label: 'Which values are out of range?',
               onTap: onSuggestionTap,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.lock_outline,
-                  size: 14,
-                  color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'All processing happens on your device',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -1164,11 +1181,13 @@ class _SuggestionChip extends StatelessWidget {
     return GestureDetector(
       onTap: () => onTap?.call(label),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: KoshikaSpacing.base,
+          vertical: KoshikaSpacing.md,
+        ),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: KoshikaRadius.xl,
           color: AppColors.surfaceContainerLow,
-          border: Border.all(color: AppColors.outlineVariant),
         ),
         child: Text(
           '"$label"',
@@ -1198,7 +1217,7 @@ class _ErrorView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1215,25 +1234,22 @@ class _ErrorView extends StatelessWidget {
                 color: AppColors.error,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             Text(
               'Something went wrong',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
+                fontSize: 20,
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: KoshikaSpacing.md),
             if (modelInfo.errorMessage != null)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(KoshikaSpacing.base),
                 decoration: BoxDecoration(
                   color: AppColors.errorContainer.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.error.withValues(alpha: 0.2),
-                  ),
+                  borderRadius: KoshikaRadius.lg,
                 ),
                 child: Text(
                   modelInfo.errorMessage!,
@@ -1243,10 +1259,9 @@ class _ErrorView extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             FilledButton.icon(
               onPressed: onRetry,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),
