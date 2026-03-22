@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../main.dart';
+import '../theme/app_colors.dart';
 import '../models/models.dart';
 import '../services/extraction_diagnostics.dart';
 import '../services/fhir_export_service.dart';
@@ -277,11 +278,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isImporting ? null : _importPdf,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         icon: _isImporting
             ? const SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
               )
             : const Icon(Icons.add),
         label: Text(_isImporting ? 'Importing...' : 'Import PDF'),
@@ -293,23 +299,33 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.upload_file_outlined,
-                      size: 80,
-                      color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                    Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer.withValues(
+                          alpha: 0.10,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.upload_file_outlined,
+                        size: 48,
+                        color: AppColors.primary,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     Text(
                       'No reports imported',
-                      style: theme.textTheme.headlineSmall,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: AppColors.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Tap the button below to import your first lab report PDF.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
+                        color: AppColors.onSurfaceVariant,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -328,7 +344,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   background: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 24),
-                    color: Colors.red,
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     child: const Icon(Icons.delete, color: Colors.white),
                   ),
                   confirmDismiss: (_) async {
@@ -367,6 +386,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     setState(() {});
                   },
                   child: Card(
+                    color: Colors.white,
                     child: ListTile(
                       onTap: () {
                         Navigator.of(context)
@@ -379,22 +399,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             .then((_) => setState(() {}));
                       },
                       leading: CircleAvatar(
-                        backgroundColor: theme.colorScheme.primaryContainer,
-                        child: Icon(
-                          Icons.description,
-                          color: theme.colorScheme.onPrimaryContainer,
+                        backgroundColor: AppColors.primaryContainer.withValues(
+                          alpha: 0.15,
+                        ),
+                        child: const Icon(
+                          Icons.description_outlined,
+                          color: AppColors.primary,
                         ),
                       ),
                       title: Text(
                         report.labName ??
                             report.originalFileName ??
                             'Lab Report',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurface,
+                        ),
                       ),
                       subtitle: Text(
                         '${report.reportDate.day}/${report.reportDate.month}/${report.reportDate.year}'
                         ' • ${report.extractedCount} biomarkers',
+                        style: const TextStyle(
+                          color: AppColors.onSurfaceVariant,
+                        ),
                       ),
-                      trailing: const Icon(Icons.chevron_right),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: AppColors.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 );

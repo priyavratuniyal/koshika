@@ -6,6 +6,8 @@ import '../widgets/flag_badge.dart';
 import '../widgets/biomarker_trend_chart.dart';
 import '../widgets/reference_range_gauge.dart';
 
+import '../theme/app_colors.dart';
+
 class BiomarkerDetailScreen extends StatefulWidget {
   final String biomarkerKey;
 
@@ -168,7 +170,7 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
                             latestResult.formattedValue,
                             style: theme.textTheme.displaySmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.primary,
+                              color: AppColors.primary,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -176,7 +178,7 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
                             Text(
                               latestResult.unit!,
                               style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                                color: AppColors.onSurfaceVariant,
                               ),
                             ),
                         ],
@@ -298,15 +300,15 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
   Color _flagRowColor(BiomarkerFlag flag) {
     switch (flag) {
       case BiomarkerFlag.normal:
-        return Colors.green.withValues(alpha: 0.06);
+        return AppColors.statusActive.withValues(alpha: 0.06);
       case BiomarkerFlag.borderline:
-        return Colors.amber.withValues(alpha: 0.10);
+        return AppColors.statusBusy.withValues(alpha: 0.08);
       case BiomarkerFlag.low:
-        return Colors.orange.withValues(alpha: 0.08);
+        return AppColors.statusBusy.withValues(alpha: 0.08);
       case BiomarkerFlag.high:
-        return Colors.red.withValues(alpha: 0.08);
+        return AppColors.error.withValues(alpha: 0.07);
       case BiomarkerFlag.critical:
-        return Colors.red.withValues(alpha: 0.14);
+        return AppColors.error.withValues(alpha: 0.12);
       case BiomarkerFlag.unknown:
         return Colors.transparent;
     }

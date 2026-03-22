@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../services/chat_context_builder.dart';
 import '../services/citation_extractor.dart';
 import '../services/embedding_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/chat_message_bubble.dart';
 
 /// The AI Chat screen — transforms from download/load prompt into a
@@ -608,74 +609,78 @@ class _NotDownloadedView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.download_for_offline_outlined,
-              size: 80,
-              color: theme.colorScheme.primary.withValues(alpha: 0.5),
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.download_for_offline_outlined,
+                size: 48,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
               'AI Assistant',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Download the ${modelInfo.name} model to chat about your health data privately on this device.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                color: AppColors.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            Card(
-              color: theme.colorScheme.surfaceContainerHighest,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.storage,
-                      size: 18,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Download size: ~${modelInfo.formattedSize}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.outlineVariant),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.wifi,
-                  size: 14,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Wi-Fi recommended',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.storage,
+                    size: 16,
+                    color: AppColors.onSurfaceVariant,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Text(
+                    'Download size: ~${modelInfo.formattedSize}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Icon(
+                    Icons.wifi,
+                    size: 16,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Wi-Fi recommended',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: onDownload,
+              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               icon: const Icon(Icons.download),
               label: const Text('Download AI Model'),
             ),
@@ -707,12 +712,25 @@ class _DownloadingView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.downloading, size: 64, color: theme.colorScheme.primary),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.downloading,
+                size: 40,
+                color: AppColors.primary,
+              ),
+            ),
             const SizedBox(height: 24),
             Text(
               'Downloading ${modelInfo.name}',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 24),
@@ -725,8 +743,10 @@ class _DownloadingView extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: progress > 0 ? progress / 100.0 : null,
                       minHeight: 8,
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHighest,
+                      backgroundColor: AppColors.surfaceContainerHigh,
+                      valueColor: const AlwaysStoppedAnimation(
+                        AppColors.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -735,7 +755,7 @@ class _DownloadingView extends StatelessWidget {
                         ? '$progress% downloaded'
                         : 'Starting download...',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: AppColors.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -745,12 +765,16 @@ class _DownloadingView extends StatelessWidget {
             Text(
               'Please keep the app open',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 24),
             OutlinedButton.icon(
               onPressed: onCancel,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.outlineVariant),
+              ),
               icon: const Icon(Icons.close, size: 18),
               label: const Text('Cancel'),
             ),
@@ -780,30 +804,40 @@ class _ReadyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.smart_toy_outlined,
-              size: 80,
-              color: theme.colorScheme.primary.withValues(alpha: 0.5),
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.smart_toy_outlined,
+                size: 48,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
               'AI Model Ready',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'The model is downloaded. Load it into memory to start chatting about your health data.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                color: AppColors.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: onLoad,
-              icon: const Icon(Icons.play_arrow),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+              icon: const Icon(Icons.play_arrow_rounded),
               label: const Text('Load Model'),
             ),
           ],
@@ -833,20 +867,24 @@ class _LoadingView extends StatelessWidget {
             const SizedBox(
               width: 48,
               height: 48,
-              child: CircularProgressIndicator(strokeWidth: 3),
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
               'Loading AI Model...',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'This may take a few seconds depending on your device.',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                color: AppColors.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -892,9 +930,9 @@ class _ChatView extends StatelessWidget {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.5,
-          ),
+          color: isSemanticSearchActive
+              ? AppColors.primaryContainer.withValues(alpha: 0.12)
+              : AppColors.surfaceContainerHigh.withValues(alpha: 0.6),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -903,8 +941,8 @@ class _ChatView extends StatelessWidget {
                 isSemanticSearchActive ? Icons.auto_awesome : Icons.text_fields,
                 size: 14,
                 color: isSemanticSearchActive
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    ? AppColors.primary
+                    : AppColors.onSurfaceVariant.withValues(alpha: 0.6),
               ),
               const SizedBox(width: 4),
               Text(
@@ -913,8 +951,8 @@ class _ChatView extends StatelessWidget {
                     : 'Keyword search (basic)',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: isSemanticSearchActive
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ? AppColors.primary
+                      : AppColors.onSurfaceVariant.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -941,10 +979,10 @@ class _ChatView extends StatelessWidget {
         // Input bar
         Container(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
+            color: AppColors.surface,
             boxShadow: [
               BoxShadow(
-                color: theme.colorScheme.shadow.withValues(alpha: 0.1),
+                color: AppColors.onSurface.withValues(alpha: 0.08),
                 blurRadius: 8,
                 offset: const Offset(0, -2),
               ),
@@ -971,7 +1009,7 @@ class _ChatView extends StatelessWidget {
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
-                      fillColor: theme.colorScheme.surfaceContainerHighest,
+                      fillColor: AppColors.surfaceContainerLow,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 12,
@@ -986,7 +1024,13 @@ class _ChatView extends StatelessWidget {
                 if (isGenerating)
                   IconButton.filledTonal(
                     onPressed: onStop,
-                    icon: const Icon(Icons.stop),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.primaryContainer.withValues(
+                        alpha: 0.2,
+                      ),
+                      foregroundColor: AppColors.primary,
+                    ),
+                    icon: const Icon(Icons.stop_rounded),
                     tooltip: 'Stop generation',
                   )
                 else
@@ -996,7 +1040,15 @@ class _ChatView extends StatelessWidget {
                       final hasText = value.text.trim().isNotEmpty;
                       return IconButton.filled(
                         onPressed: hasText ? onSend : null,
-                        icon: const Icon(Icons.send),
+                        style: IconButton.styleFrom(
+                          backgroundColor: hasText
+                              ? AppColors.primary
+                              : AppColors.surfaceContainerHigh,
+                          foregroundColor: hasText
+                              ? Colors.white
+                              : AppColors.onSurfaceVariant,
+                        ),
+                        icon: const Icon(Icons.send_rounded),
                         tooltip: 'Send message',
                       );
                     },
@@ -1029,17 +1081,25 @@ class _EmptyChatView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 64,
-              color: theme.colorScheme.primary.withValues(alpha: 0.3),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 36,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               'Ask about your health data',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                color: AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -1047,7 +1107,7 @@ class _EmptyChatView extends StatelessWidget {
               'Your lab data is automatically included as context. '
               'Try asking:',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                color: AppColors.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1073,13 +1133,13 @@ class _EmptyChatView extends StatelessWidget {
                 Icon(
                   Icons.lock_outline,
                   size: 14,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                  color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
                 ),
                 const SizedBox(width: 4),
                 Text(
                   'All processing happens on your device',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -1107,12 +1167,13 @@ class _SuggestionChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
+          color: AppColors.surfaceContainerLow,
+          border: Border.all(color: AppColors.outlineVariant),
         ),
         child: Text(
           '"$label"',
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.primary,
+            color: AppColors.primary,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -1141,12 +1202,25 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.errorContainer.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                size: 40,
+                color: AppColors.error,
+              ),
+            ),
             const SizedBox(height: 16),
             Text(
               'Something went wrong',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: AppColors.onSurface,
               ),
             ),
             const SizedBox(height: 12),
@@ -1155,15 +1229,16 @@ class _ErrorView extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer.withValues(
-                    alpha: 0.3,
-                  ),
+                  color: AppColors.errorContainer.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Text(
                   modelInfo.errorMessage!,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onErrorContainer,
+                    color: AppColors.error,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -1171,6 +1246,7 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: onRetry,
+              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),

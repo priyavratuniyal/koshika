@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 
 import '../main.dart';
+import '../theme/app_colors.dart';
 import '../models/models.dart';
 import '../services/embedding_service.dart';
 import '../services/fhir_export_service.dart';
@@ -326,12 +327,12 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
           Text(
             title.toUpperCase(),
             style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.primary,
+              color: AppColors.primary,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
             ),
@@ -503,16 +504,16 @@ class _ModelStatusTile extends StatelessWidget {
   Color _statusColor(ThemeData theme) {
     switch (modelInfo.status) {
       case ModelStatus.notDownloaded:
-        return theme.colorScheme.outline;
+        return AppColors.onSurfaceVariant;
       case ModelStatus.downloading:
       case ModelStatus.loading:
-        return Colors.amber.shade700;
+        return AppColors.statusBusy;
       case ModelStatus.ready:
-        return Colors.blue;
+        return AppColors.statusReady;
       case ModelStatus.loaded:
-        return Colors.green;
+        return AppColors.statusActive;
       case ModelStatus.error:
-        return theme.colorScheme.error;
+        return AppColors.error;
     }
   }
 }
@@ -691,16 +692,16 @@ class _EmbeddingModelTile extends StatelessWidget {
   Color _statusColor(ThemeData theme) {
     switch (modelInfo.status) {
       case ModelStatus.notDownloaded:
-        return theme.colorScheme.outline;
+        return AppColors.onSurfaceVariant;
       case ModelStatus.downloading:
       case ModelStatus.loading:
-        return Colors.amber.shade700;
+        return AppColors.statusBusy;
       case ModelStatus.ready:
-        return Colors.blue;
+        return AppColors.statusReady;
       case ModelStatus.loaded:
-        return Colors.green;
+        return AppColors.statusActive;
       case ModelStatus.error:
-        return theme.colorScheme.error;
+        return AppColors.error;
     }
   }
 }
