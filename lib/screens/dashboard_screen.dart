@@ -509,14 +509,15 @@ class _HeroCard extends StatelessWidget {
                 ),
                 const SizedBox(height: KoshikaSpacing.xl),
                 // Stats row
-                Row(
+                Wrap(
+                  spacing: KoshikaSpacing.xxl,
+                  runSpacing: KoshikaSpacing.sm,
                   children: [
                     _StatItem(
                       value: '$totalTracked',
                       label: 'TRACKED',
                       valueColor: Colors.white,
                     ),
-                    const SizedBox(width: KoshikaSpacing.xxl),
                     _StatItem(
                       value: '$abnormalCount',
                       label: 'FLAGGED',
@@ -524,8 +525,7 @@ class _HeroCard extends StatelessWidget {
                           ? const Color(0xFFFFB4AB)
                           : Colors.white,
                     ),
-                    if (lastReport != null) ...[
-                      const SizedBox(width: KoshikaSpacing.xxl),
+                    if (lastReport != null)
                       _StatItem(
                         value: DateFormat(
                           'MMM d',
@@ -533,7 +533,6 @@ class _HeroCard extends StatelessWidget {
                         label: 'LAST REPORT',
                         valueColor: AppColors.onPrimaryContainer,
                       ),
-                    ],
                   ],
                 ),
               ],

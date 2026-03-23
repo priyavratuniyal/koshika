@@ -84,7 +84,7 @@ class KoshikaApp extends StatelessWidget {
       brightness: Brightness.light,
       textTheme: KoshikaTypography.textTheme,
       appBarTheme: const AppBarTheme(
-        centerTitle: true,
+        centerTitle: false,
         elevation: 0,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -141,7 +141,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
       body: _buildCurrentScreen(),
       bottomNavigationBar: ClipRect(
         child: BackdropFilter(
