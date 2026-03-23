@@ -50,12 +50,15 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _contextBuilder = ChatContextBuilder(vectorStore: vectorStoreService);
-    _loadMostRecentSession();
     _statusSubscription = gemmaService.modelStatusStream.listen((info) {
       if (mounted) {
         setState(() => _modelInfo = info);
       }
     });
+    // Auto-load model if already downloaded
+    if (_modelInfo.status == ModelStatus.ready) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadModel());
+    }
   }
 
   @override
@@ -65,31 +68,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _loadMostRecentSession() {
-    try {
-      final sessions = objectbox.getAllSessions();
-      if (sessions.isEmpty) return;
-
-      final session = sessions.first;
-      final persisted = objectbox.getMessagesForSession(session.id);
-      _currentSession = session;
-      _messages.addAll(
-        persisted.map(
-          (m) => ChatMessage(
-            id: 'db-${m.id}',
-            content: m.content,
-            role: _roleFromIndex(m.roleIndex),
-            timestamp: m.timestamp,
-            isStreaming: false,
-            isError: m.isError,
-          ),
-        ),
-      );
-    } catch (e, st) {
-      _logStorageError('load most recent session', e, st);
-    }
   }
 
   ChatRole _roleFromIndex(int index) {

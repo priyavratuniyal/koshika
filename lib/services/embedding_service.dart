@@ -69,6 +69,18 @@ class EmbeddingService {
         _modelUrlToFilename(_modelUrl),
       );
       if (isInstalled) {
+        // Re-register with the SDK so getActiveEmbedder() works without
+        // needing a redundant "download" tap. The SDK detects the files
+        // already exist and skips the actual download.
+        try {
+          await FlutterGemma.installEmbedder()
+              .modelFromNetwork(_modelUrl)
+              .tokenizerFromNetwork(_tokenizerUrl, iosPath: _iosTokenizerUrl)
+              .install();
+        } catch (e) {
+          debugPrint('EmbeddingService: SDK re-registration skipped ($e)');
+        }
+
         _updateStatus(
           _modelInfo.copyWith(status: ModelStatus.ready, downloadProgress: 100),
         );
@@ -204,12 +216,12 @@ class EmbeddingService {
         );
         _updateStatus(_modelInfo.copyWith(status: ModelStatus.loaded));
       } catch (cpuError) {
+        debugPrint('EmbeddingService.loadModel CPU fallback failed: $cpuError');
         _embedder = null;
         _updateStatus(
           _modelInfo.copyWith(
             status: ModelStatus.error,
-            errorMessage:
-                'Failed to load embedding model: ${cpuError.toString().length > 100 ? '${cpuError.toString().substring(0, 100)}...' : cpuError}',
+            errorMessage: ErrorClassifier.load(cpuError),
           ),
         );
       }

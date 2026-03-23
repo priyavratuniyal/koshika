@@ -96,9 +96,11 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.of(context).pushReplacementNamed('/onboarding');
       }
     } catch (e) {
+      debugPrint('SplashScreen initialization error: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to initialize: $e';
+          _errorMessage =
+              'Something went wrong during startup. Please restart the app.';
         });
       }
     }
