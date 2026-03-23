@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/model_info.dart';
 import '../services/objectbox_store.dart';
 import '../services/biomarker_dictionary.dart';
 import '../services/embedding_service.dart';
@@ -79,6 +80,19 @@ class _SplashScreenState extends State<SplashScreen>
         app_main.embeddingService,
       );
       await app_main.vectorStoreService.initialize();
+
+      // Kick off model loading in the background if already downloaded.
+      // These are unawaited — navigation proceeds immediately, models finish
+      // loading while the user is on the home screen.
+      if (app_main.gemmaService.currentModelInfo.status == ModelStatus.ready) {
+        // ignore: unawaited_futures
+        app_main.gemmaService.loadModel();
+      }
+      if (app_main.embeddingService.currentModelInfo.status ==
+          ModelStatus.ready) {
+        // ignore: unawaited_futures
+        app_main.embeddingService.loadModel();
+      }
 
       // Ensure animation has played for at least 1.5 seconds
       await Future.delayed(const Duration(milliseconds: 1500));
