@@ -1,90 +1,138 @@
-# Koshika
+# Koshika — कोशिका
 
-![Status](https://img.shields.io/badge/Status-Active_Development-brightgreen)
-![Platform](https://img.shields.io/badge/Platform-Android%20|%20iOS-blue)
-![Dart](https://img.shields.io/badge/Dart-%3E%3D3.9.2-0175C2)
+*Hindi for "cell" — your health data lives in yours, not the cloud.*
+
+![FOSS Hack 2026](https://img.shields.io/badge/FOSS_Hack_2026-Submission-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Platform](https://img.shields.io/badge/Platform-Android-blue)
+![Dart](https://img.shields.io/badge/Dart-%3E%3D3.9.2-0175C2)
 
-**Your health data lives in your cell, not the cloud.**
+Koshika extracts biomarker data from PDF lab reports, tracks trends over time, and lets you discuss results with an on-device AI — all without a single byte leaving your phone.
 
-Koshika is an offline-first, privacy-focused health app that extracts biomarker data from PDF lab reports, tracks trends over time, and lets you discuss your results with an on-device AI — all without a single byte leaving your phone.
+<!-- Replace with actual screenshots when ready -->
+<!-- <p align="center">
+  <img src="docs/screenshots/dashboard.png" width="200" alt="Dashboard"/>
+  <img src="docs/screenshots/biomarker-detail.png" width="200" alt="Biomarker Detail"/>
+  <img src="docs/screenshots/chat.png" width="200" alt="AI Chat"/>
+  <img src="docs/screenshots/reports.png" width="200" alt="Reports"/>
+</p> -->
 
 ---
 
-## Why Koshika?
+## The Problem
 
-Indian pathology labs produce PDF reports in dozens of inconsistent formats. Most health apps either can't parse them, or require uploading to a cloud service to try.
+Over 200 million Indians get blood tests every year from labs like Thyrocare, Dr. Lal PathLabs, SRL, and Metropolis. Results arrive as unstructured PDFs filled with cryptic abbreviations (SGPT, HbA1c, TSH) and reference ranges that mean nothing to most people. Every existing solution either can't parse these formats or requires uploading private health data to a cloud server.
 
-Koshika solves this differently:
+**Koshika's approach:**
 
-- **Parses locally.** A multi-pattern regex engine + fuzzy matching handles the formatting chaos of Thyrocare, SRL, Dr. Lal PathLabs, and others — directly on your device.
-- **Understands your data.** Biomarkers are normalized to a standard dictionary, flagged against reference ranges, and tracked historically with trend charts.
+- **Parses locally.** A 4-pattern regex engine + fuzzy matching handles the formatting chaos of Indian lab PDFs — directly on your device.
+- **Understands your data.** 64 biomarkers normalized to a standard dictionary, flagged against reference ranges, tracked historically with trend charts.
 - **Runs AI on-device.** Gemma 3 1B runs inference locally via MediaPipe. Ask questions about your reports and get citation-backed answers grounded in your actual lab values.
-- **Never phones home.** No accounts, no telemetry, no cloud sync. Your health data stays in ObjectBox on your device.
+- **Never phones home.** No accounts, no telemetry, no cloud sync. ObjectBox database lives on your device, period.
+
+> Turn on airplane mode. Import a PDF. Ask the AI about your cholesterol. Everything works.
+
+---
+
+## How It Works
+
+```mermaid
+flowchart LR
+    A[PDF Import] --> B{Text Extractable?}
+    B -- Yes --> C[Syncfusion PDF]
+    B -- No --> D[ML Kit OCR]
+    C --> E[4-Pattern Regex Engine]
+    D --> E
+    E --> F[Fuzzy Match · 64 Biomarkers]
+    F --> G[ObjectBox Storage]
+    G --> H[Dashboard & Trend Charts]
+    G --> I[Embed · 768-dim Vectors]
+    I --> J[HNSW Vector Index]
+    J --> K[RAG Chat with Citations]
+    G --> L[FHIR R4 Export]
+```
+
+PDFs are parsed on-device using text extraction (or OCR for scanned reports), then run through a multi-pattern regex engine that fuzzy-matches results against a LOINC-coded biomarker dictionary. Parsed data powers trend charts, an AI chat grounded in your actual lab values, and FHIR-compliant export.
+
+---
+
+## Two-Tier Architecture
+
+The app ships as a lightweight base with an optional AI layer — download only what you need.
+
+|  | Base Layer | AI Layer |
+|---|---|---|
+| **Size** | ~15 MB (app install) | +555 MB LLM, +183 MB embeddings |
+| **Capabilities** | PDF parsing, biomarker extraction, trend charts, FHIR export | On-device chat, semantic search, RAG pipeline |
+| **Works offline?** | Immediately | After one-time model download |
+| **Required?** | Yes | Optional |
+
+The base layer handles everything most users need. The AI layer downloads Gemma 3 1B (555 MB) and EmbeddingGemma 300M (183 MB) once over Wi-Fi, then runs entirely on-device forever.
 
 ---
 
 ## Features
 
 ### PDF Parsing
-- Extracts structured data from digital PDFs using `syncfusion_flutter_pdf`
-- OCR fallback for scanned/image-based pages using Google ML Kit
-- Staged import progress with clear error messaging for unsupported layouts
-- Fuzzy term matching normalizes lab-specific naming ("FASTING SUGAR" → "Glucose, Fasting") across 63 biomarker definitions in 10 medical categories
+- Text extraction via Syncfusion Flutter PDF with OCR fallback (Google ML Kit) for scanned reports
+- 4 regex patterns: space-delimited, colon-separated, pipe-delimited, and loose catch-all
+- Fuzzy term matching normalizes lab-specific naming across 64 biomarker definitions in 10 categories (CBC, Lipid Panel, Liver, Kidney, Thyroid, Diabetes, Vitamins, Iron Studies, Electrolytes, Inflammation)
+- Every biomarker mapped to a LOINC code for interoperability
 
 ### On-Device AI
-- **Gemma 3 1B IT** — instruction-tuned LLM running locally via `flutter_gemma` + MediaPipe
-- GPU-first inference with automatic CPU fallback
-- Streaming token-by-token responses
-- **EmbeddingGemma 300M** — on-device embeddings for semantic search (~75 MB, 768-dim)
-- **RAG pipeline** — embeds your query, searches an HNSW vector index of your lab results, injects the top-5 matches as context, and generates grounded responses with source citations `[1]`, `[2]`
-- Graceful degradation — keyword search works seamlessly when the embedding model isn't loaded
+- **Gemma 3 1B IT** (555 MB, int4) — streaming token-by-token responses via flutter_gemma + MediaPipe
+- **EmbeddingGemma 300M** (183 MB) — 768-dimensional vectors for semantic search
+- **RAG pipeline** — embeds your query, searches an HNSW vector index of your lab results, injects top matches as context, generates grounded responses with source citations `[1]`, `[2]`
+- Graceful degradation — keyword search works when the embedding model isn't loaded
 
 ### Dashboard & Trends
-- Health overview with tracked biomarker count, abnormal flags, and borderline detection (within 10% of reference boundaries)
-- "Attention Needed" panel for out-of-range results
-- Category-level trend indicators
-- Biomarker detail view with interactive `fl_chart` trend visualization, reference range gauge, and color-coded history
-- Borderline flag detection reflected across the entire app
+- Health overview with biomarker count, abnormal flags, and borderline detection (within 10% of reference boundaries)
+- Interactive trend charts (fl_chart) with shaded reference range bands
+- Reference range gauge showing where your value falls
+- Category-level health score indicators
 
 ### Privacy & Export
-- All processing happens on-device — parsing, AI inference, embeddings, search
-- ObjectBox local database with no network dependency
-- FHIR R4 Bundle export for sharing with healthcare providers
-- Native share sheet integration via `share_plus`
-
-### Onboarding
-- Animated splash screen with branded fade/scale animation
-- 3-screen onboarding flow (Welcome, How it Works, Privacy)
-- Subsequent launches skip directly to home
+- Zero network dependency — all processing on-device
+- FHIR R4 Bundle export (Patient + DiagnosticReport + Observations) with LOINC coding
+- Native share sheet via share_plus
+- No accounts, no telemetry, no analytics
 
 ---
 
-## Architecture
+## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Flutter (StatefulWidget) |
-| Local DB | ObjectBox |
-| PDF Extraction | syncfusion_flutter_pdf |
-| OCR Fallback | google_mlkit_text_recognition + pdfx |
-| Text Analysis | Custom multi-regex engine + string_similarity |
-| On-Device LLM | flutter_gemma (Gemma 3 1B IT, MediaPipe) |
-| Embeddings | EmbeddingGemma 300M (HNSW via SQLite VectorStore) |
-| Charts | fl_chart |
-| Export | FHIR R4 (fhir_r4 package) |
+| Component | Technology | Version |
+|---|---|---|
+| Framework | Flutter | SDK ^3.9.2 |
+| Local DB | ObjectBox | ^5.2.0 |
+| PDF Extraction | Syncfusion Flutter PDF | ^32.2.9 |
+| OCR | Google ML Kit Text Recognition | ^0.13.1 |
+| Text Analysis | Custom regex engine + string_similarity | ^2.0.0 |
+| On-Device LLM | flutter_gemma (Gemma 3 1B IT, MediaPipe) | ^0.12.5 |
+| Embeddings | EmbeddingGemma 300M (HNSW vector index) | — |
+| Charts | fl_chart | ^0.70.2 |
+| FHIR Export | fhir_r4 | ^0.5.1 |
 
-### Project Structure
+**By the numbers:** 40 Dart files · 15 services · 5 widgets · 8 screens · 64 biomarker definitions · 10 medical categories · 4 regex patterns · 768-dim embeddings
+
+---
+
+## Project Structure
 
 ```text
 lib/
-├── models/          # ObjectBox entities (Patient, LabReport, BiomarkerResult, ChatMessage)
-├── screens/         # UI (Dashboard, Reports, Chat, Settings, BiomarkerDetail, Onboarding)
-├── services/        # Core logic (PDF extraction, parsing, AI, embeddings, vector search, FHIR)
-├── widgets/         # Reusable components (trend chart, gauge, flag badge, chat bubble)
-└── main.dart        # App entry, theme, navigation
+├── models/          # 5 ObjectBox entities (Patient, LabReport, BiomarkerResult, ChatSession, ChatMessage)
+├── screens/         # 8 screens (Dashboard, Reports, ReportDetail, BiomarkerDetail, Chat, Settings, Onboarding, Splash)
+├── services/        # 15 services
+│   ├── PDF:         pdf_text_extractor, ocr_text_recognition, pdf_page_render, ocr_row_reconstructor
+│   ├── Parsing:     lab_report_parser, biomarker_dictionary, pdf_import
+│   ├── AI:          gemma_service, embedding_service, vector_store, chat_context_builder, citation_extractor
+│   ├── Storage:     objectbox_store
+│   └── Export:      fhir_export
+├── widgets/         # 5 components (trend chart, gauge, flag badge, chat bubble, shimmer)
+└── main.dart
 
-assets/data/         # Biomarker dictionary (63 definitions, 10 categories)
+assets/data/         # Biomarker dictionary (64 definitions, LOINC-coded)
 ```
 
 ---
@@ -105,31 +153,22 @@ dart run build_runner build --delete-conflicting-outputs
 flutter run
 ```
 
-### Auto-format on commit (optional)
+Base features work immediately after install. To enable AI chat, go to **Settings** and download the models (~740 MB total). Models auto-load on subsequent launches.
 
-This repo uses a Husky pre-commit hook that auto-formats staged Dart files:
+---
 
-```bash
-npm install
-```
+## Design
+
+Light mode only — intentional. Koshika follows a **"Clinical Curator"** design philosophy: editorial authority with warmth, tonal depth over structural lines. Typography: Manrope (headlines) + Inter (body). Brand color: Deep Teal `#00342B`.
 
 ---
 
 ## Roadmap
 
-- [x] PDF parsing with multi-pattern regex engine
-- [x] OCR fallback for scanned reports
-- [x] Fuzzy biomarker matching (63 definitions, 10 categories)
-- [x] Dashboard with health overview and trend indicators
-- [x] Biomarker detail view with trend charts and reference gauges
-- [x] Borderline detection (10% margin flagging)
-- [x] FHIR R4 export
-- [x] On-device LLM (Gemma 3 1B IT via MediaPipe)
-- [x] Semantic search with EmbeddingGemma 300M
-- [x] RAG pipeline with citation-backed responses
-- [x] Animated splash screen and onboarding flow
-- [ ] Conversation memory (persistent chat sessions)
-- [ ] Health Connect wearable integration
+**Shipped:** PDF parsing (4 regex patterns, OCR fallback) · fuzzy matching (64 biomarkers, 10 categories) · dashboard with trends and gauges · borderline detection · FHIR R4 export · on-device LLM (Gemma 3 1B) · semantic search (EmbeddingGemma 300M) · RAG with citations · onboarding flow
+
+**Planned:**
+- [ ] Health Connect wearable integration (steps, heart rate, SpO2)
 - [ ] Computed health risk scores (FIB-4, eGFR, APRI)
 - [ ] Biomarker anomaly detection (EWMA, personal baselines)
 - [ ] Nutritional and lifestyle recommendations
@@ -142,18 +181,33 @@ npm install
 ## Known Limitations
 
 - OCR for scanned reports is experimental — accuracy varies across lab formats
+- First AI model download requires ~740 MB (555 MB LLM + 183 MB embeddings); after download, everything runs offline
+- The 1B-parameter on-device LLM excels at biomarker explanations and trend summaries; complex multi-step medical reasoning benefits from larger models
 - Web platform is planned but not yet implemented
-- The on-device LLM (1B parameters) is best suited for simple explanations; complex medical reasoning has limits inherent to the model size
 
 ---
 
 ## Contributing
 
-Pull requests are welcome.
+Pull requests are welcome. We especially welcome regex patterns for lab formats we don't yet handle — open an issue with a redacted sample PDF (all personal information removed).
 
-If you find a lab report format that the parser fails to handle, please open an issue with a redacted sample (remove personal information) or contribute a regex pattern.
+When contributing, use conventional commit messages (`feat:`, `fix:`, `chore:`, `refactor:`), with each commit focused on one logical change.
 
-When contributing, keep each commit focused on one logical change and use conventional commit messages (`feat:`, `fix:`, `chore:`, `refactor:`).
+### Auto-format on commit
+
+This repo uses a Husky pre-commit hook that auto-formats staged Dart files:
+
+```bash
+npm install
+```
+
+---
+
+## FOSS Hack 2026
+
+Built for [FOSS Hack 2026](https://fossunited.org/hack/2026) by [Priyavrat Uniyal](https://github.com/priyavratuniyal).
+
+On-device inference powered by Google's Gemma 3 1B IT and EmbeddingGemma 300M via MediaPipe, running locally through [flutter_gemma](https://pub.dev/packages/flutter_gemma). No cloud AI services are used. AI tools were used for code generation, debugging, and documentation. All architectural decisions were made by the developer.
 
 ---
 
