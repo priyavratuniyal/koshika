@@ -384,47 +384,49 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: KoshikaSpacing.base,
-          vertical: KoshikaSpacing.md,
-        ),
-        margin: const EdgeInsets.only(bottom: KoshikaSpacing.xs),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: KoshikaSpacing.xs),
+      child: Material(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: KoshikaRadius.lg,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: KoshikaRadius.lg,
-        ),
-        child: Row(
-          children: [
-            IconContainer(icon: icon, color: iconColor),
-            const SizedBox(width: KoshikaSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: titleColor ?? AppColors.onSurface,
-                    ),
-                  ),
-                  if (subtitle != null)
-                    Text(
-                      subtitle!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                ],
-              ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: KoshikaSpacing.base,
+              vertical: KoshikaSpacing.md,
             ),
-            if (trailing != null) trailing!,
-          ],
+            child: Row(
+              children: [
+                IconContainer(icon: icon, color: iconColor),
+                const SizedBox(width: KoshikaSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: titleColor ?? AppColors.onSurface,
+                        ),
+                      ),
+                      if (subtitle != null)
+                        Text(
+                          subtitle!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (trailing != null) trailing!,
+              ],
+            ),
+          ),
         ),
       ),
     );

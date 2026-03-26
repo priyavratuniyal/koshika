@@ -43,106 +43,83 @@ class ChatMessageBubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.8,
         ),
         margin: const EdgeInsets.symmetric(vertical: KoshikaSpacing.xs),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        padding: const EdgeInsets.symmetric(
+          horizontal: KoshikaSpacing.base,
+          vertical: KoshikaSpacing.md,
+        ),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: KoshikaRadius.xxl,
+          border: (!isUser && !isError)
+              ? const Border(
+                  left: BorderSide(color: AppColors.primary, width: 4),
+                )
+              : null,
+        ),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Left accent strip for AI messages
+            // AI label for assistant messages
             if (!isUser && !isError)
-              Container(
-                width: 4,
-                constraints: const BoxConstraints(minHeight: 40),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(2),
+              Padding(
+                padding: const EdgeInsets.only(bottom: KoshikaSpacing.xs),
+                child: Text(
+                  'KOSHIKA INTELLIGENCE',
+                  style: KoshikaTypography.metricLabel.copyWith(
+                    color: AppColors.primary,
+                    letterSpacing: 1.0,
+                  ),
                 ),
               ),
-            Flexible(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: KoshikaSpacing.base,
-                  vertical: KoshikaSpacing.md,
-                ),
-                decoration: BoxDecoration(
-                  color: bubbleColor,
-                  borderRadius: KoshikaRadius.xxl,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+
+            // Error icon row
+            if (isError)
+              Padding(
+                padding: const EdgeInsets.only(bottom: KoshikaSpacing.xs),
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // AI label for assistant messages
-                    if (!isUser && !isError)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: KoshikaSpacing.xs,
-                        ),
-                        child: Text(
-                          'KOSHIKA INTELLIGENCE',
-                          style: KoshikaTypography.metricLabel.copyWith(
-                            color: AppColors.primary,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                      ),
-
-                    // Error icon row
-                    if (isError)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: KoshikaSpacing.xs,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              size: 16,
-                              color: AppColors.error,
-                            ),
-                            const SizedBox(width: KoshikaSpacing.xs),
-                            Text(
-                              'Error',
-                              style: KoshikaTypography.statusText.copyWith(
-                                color: AppColors.error,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    // Message content — or streaming dots if content is empty
-                    if (message.content.isEmpty && message.isStreaming)
-                      _StreamingDots(color: textColor)
-                    else
-                      SelectableText(
-                        message.content,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 15,
-                          height: 1.4,
-                        ),
-                      ),
-
-                    // Streaming indicator appended to text
-                    if (message.content.isNotEmpty && message.isStreaming)
-                      Padding(
-                        padding: const EdgeInsets.only(top: KoshikaSpacing.xs),
-                        child: _StreamingDots(color: textColor),
-                      ),
-
-                    // Timestamp
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        DateFormat('h:mm a').format(message.timestamp),
-                        style: TextStyle(
-                          color: textColor.withValues(alpha: 0.5),
-                          fontSize: 11,
-                        ),
+                    const Icon(
+                      Icons.error_outline,
+                      size: 16,
+                      color: AppColors.error,
+                    ),
+                    const SizedBox(width: KoshikaSpacing.xs),
+                    Text(
+                      'Error',
+                      style: KoshikaTypography.statusText.copyWith(
+                        color: AppColors.error,
                       ),
                     ),
                   ],
+                ),
+              ),
+
+            // Message content — or streaming dots if content is empty
+            if (message.content.isEmpty && message.isStreaming)
+              _StreamingDots(color: textColor)
+            else
+              SelectableText(
+                message.content,
+                style: TextStyle(color: textColor, fontSize: 15, height: 1.4),
+              ),
+
+            // Streaming indicator appended to text
+            if (message.content.isNotEmpty && message.isStreaming)
+              Padding(
+                padding: const EdgeInsets.only(top: KoshikaSpacing.xs),
+                child: _StreamingDots(color: textColor),
+              ),
+
+            // Timestamp
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                DateFormat('h:mm a').format(message.timestamp),
+                style: TextStyle(
+                  color: textColor.withValues(alpha: 0.5),
+                  fontSize: 11,
                 ),
               ),
             ),

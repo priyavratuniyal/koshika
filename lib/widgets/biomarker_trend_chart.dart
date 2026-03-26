@@ -240,7 +240,9 @@ class BiomarkerTrendChart extends StatelessWidget {
                       'dd MMM yyyy',
                     ).format(result.testDate);
                     final flagStr = _getFlagCode(result.flag);
-                    final flagColor = (result.flag == BiomarkerFlag.normal)
+                    final flagColor =
+                        (result.flag == BiomarkerFlag.normal ||
+                            result.flag == BiomarkerFlag.unknown)
                         ? AppColors.success
                         : AppColors.error;
                     return LineTooltipItem(

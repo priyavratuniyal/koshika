@@ -73,46 +73,43 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
         backgroundColor: AppColors.surface,
         appBar: AppBar(title: const Text('Loading...')),
         body: ShimmerScope(
-          child: Padding(
+          child: ListView(
             padding: const EdgeInsets.all(KoshikaSpacing.base),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ShimmerBox(
-                  width: double.infinity,
-                  height: 200,
-                  borderRadius: KoshikaRadius.xxl,
-                ),
-                const SizedBox(height: KoshikaSpacing.xl),
-                ShimmerLine(width: 120),
-                const SizedBox(height: KoshikaSpacing.base),
-                ShimmerBox(
-                  width: double.infinity,
-                  height: 180,
-                  borderRadius: KoshikaRadius.xxl,
-                ),
-                const SizedBox(height: KoshikaSpacing.xl),
-                ShimmerLine(width: 80),
-                const SizedBox(height: KoshikaSpacing.md),
-                ShimmerBox(
-                  width: double.infinity,
-                  height: 60,
-                  borderRadius: KoshikaRadius.lg,
-                ),
-                const SizedBox(height: KoshikaSpacing.sm),
-                ShimmerBox(
-                  width: double.infinity,
-                  height: 60,
-                  borderRadius: KoshikaRadius.lg,
-                ),
-                const SizedBox(height: KoshikaSpacing.sm),
-                ShimmerBox(
-                  width: double.infinity,
-                  height: 60,
-                  borderRadius: KoshikaRadius.lg,
-                ),
-              ],
-            ),
+            children: [
+              ShimmerBox(
+                width: double.infinity,
+                height: 200,
+                borderRadius: KoshikaRadius.xxl,
+              ),
+              const SizedBox(height: KoshikaSpacing.xl),
+              ShimmerLine(width: 120),
+              const SizedBox(height: KoshikaSpacing.base),
+              ShimmerBox(
+                width: double.infinity,
+                height: 180,
+                borderRadius: KoshikaRadius.xxl,
+              ),
+              const SizedBox(height: KoshikaSpacing.xl),
+              ShimmerLine(width: 80),
+              const SizedBox(height: KoshikaSpacing.md),
+              ShimmerBox(
+                width: double.infinity,
+                height: 60,
+                borderRadius: KoshikaRadius.lg,
+              ),
+              const SizedBox(height: KoshikaSpacing.sm),
+              ShimmerBox(
+                width: double.infinity,
+                height: 60,
+                borderRadius: KoshikaRadius.lg,
+              ),
+              const SizedBox(height: KoshikaSpacing.sm),
+              ShimmerBox(
+                width: double.infinity,
+                height: 60,
+                borderRadius: KoshikaRadius.lg,
+              ),
+            ],
           ),
         ),
       );

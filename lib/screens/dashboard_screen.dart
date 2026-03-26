@@ -228,7 +228,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           a.flag != BiomarkerFlag.critical) {
         return 1;
       }
-      return 0;
+      return a.displayName.compareTo(b.displayName);
     });
 
     final allHistories = objectbox.getHistoryForBiomarkers(
