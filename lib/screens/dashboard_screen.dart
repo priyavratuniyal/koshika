@@ -219,10 +219,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     outOfRangeResults.sort((a, b) {
-      if (a.flag == BiomarkerFlag.critical && b.flag != BiomarkerFlag.critical)
+      if (a.flag == BiomarkerFlag.critical &&
+          b.flag != BiomarkerFlag.critical) {
         return -1;
-      if (b.flag == BiomarkerFlag.critical && a.flag != BiomarkerFlag.critical)
+      }
+      if (b.flag == BiomarkerFlag.critical &&
+          a.flag != BiomarkerFlag.critical) {
         return 1;
+      }
       return 0;
     });
 
@@ -311,8 +315,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           final catResults = latestResults.values
                               .where((r) => r.category == cat)
                               .toList();
-                          if (catResults.isEmpty)
+                          if (catResults.isEmpty) {
                             return const SizedBox.shrink();
+                          }
                           final barHeights = _categoryBarHeights(
                             catResults,
                             allHistories,
