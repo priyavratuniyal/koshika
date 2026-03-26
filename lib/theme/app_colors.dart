@@ -63,25 +63,38 @@ abstract final class AppColors {
     final key = category.toLowerCase().trim();
     if (key.contains('blood') ||
         key.contains('cbc') ||
-        key.contains('hematology'))
+        key.contains('hematology')) {
       return categoryCbc;
-    if (key.contains('thyroid') || key.contains('endocrine'))
+    }
+    if (key.contains('thyroid') || key.contains('endocrine')) {
       return categoryThyroid;
-    if (key.contains('lipid') || key.contains('cholesterol'))
+    }
+    if (key.contains('lipid') || key.contains('cholesterol')) {
       return categoryLipid;
-    if (key.contains('liver') || key.contains('hepatic')) return categoryLiver;
-    if (key.contains('kidney') || key.contains('renal')) return categoryKidney;
-    if (key.contains('vitamin') || key.contains('nutrient'))
+    }
+    if (key.contains('liver') || key.contains('hepatic')) {
+      return categoryLiver;
+    }
+    if (key.contains('kidney') || key.contains('renal')) {
+      return categoryKidney;
+    }
+    if (key.contains('vitamin') || key.contains('nutrient')) {
       return categoryVitamins;
-    if (key.contains('iron') || key.contains('ferritin')) return categoryIron;
-    if (key.contains('electrolyte') || key.contains('mineral'))
+    }
+    if (key.contains('iron') || key.contains('ferritin')) {
+      return categoryIron;
+    }
+    if (key.contains('electrolyte') || key.contains('mineral')) {
       return categoryElectrolytes;
+    }
     if (key.contains('diabetes') ||
         key.contains('glucose') ||
-        key.contains('hba1c'))
+        key.contains('hba1c')) {
       return categoryDiabetes;
-    if (key.contains('inflam') || key.contains('crp') || key.contains('esr'))
+    }
+    if (key.contains('inflam') || key.contains('crp') || key.contains('esr')) {
       return categoryInflammation;
+    }
     return secondary; // fallback
   }
 
