@@ -20,6 +20,9 @@ dependencies:
   share_plus: ^10.1.4
   path: ^1.9.1
 
+  # Typography
+  google_fonts: ^6.2.1
+
   # Charts & visualization
   fl_chart: ^0.70.2
 

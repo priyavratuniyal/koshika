@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../main.dart';
 import '../models/models.dart';
+import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 import '../widgets/flag_badge.dart';
+import '../widgets/status_badge.dart';
 import '../widgets/biomarker_trend_chart.dart';
 import '../widgets/reference_range_gauge.dart';
-
-import '../theme/app_colors.dart';
+import '../widgets/shimmer_loading.dart';
 
 class BiomarkerDetailScreen extends StatefulWidget {
   final String biomarkerKey;
@@ -65,32 +68,75 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (_isLoading) {
       return Scaffold(
+        backgroundColor: AppColors.surface,
         appBar: AppBar(title: const Text('Loading...')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: ShimmerScope(
+          child: ListView(
+            padding: const EdgeInsets.all(KoshikaSpacing.base),
+            children: [
+              ShimmerBox(
+                width: double.infinity,
+                height: 200,
+                borderRadius: KoshikaRadius.xxl,
+              ),
+              const SizedBox(height: KoshikaSpacing.xl),
+              ShimmerLine(width: 120),
+              const SizedBox(height: KoshikaSpacing.base),
+              ShimmerBox(
+                width: double.infinity,
+                height: 180,
+                borderRadius: KoshikaRadius.xxl,
+              ),
+              const SizedBox(height: KoshikaSpacing.xl),
+              ShimmerLine(width: 80),
+              const SizedBox(height: KoshikaSpacing.md),
+              ShimmerBox(
+                width: double.infinity,
+                height: 60,
+                borderRadius: KoshikaRadius.lg,
+              ),
+              const SizedBox(height: KoshikaSpacing.sm),
+              ShimmerBox(
+                width: double.infinity,
+                height: 60,
+                borderRadius: KoshikaRadius.lg,
+              ),
+              const SizedBox(height: KoshikaSpacing.sm),
+              ShimmerBox(
+                width: double.infinity,
+                height: 60,
+                borderRadius: KoshikaRadius.lg,
+              ),
+            ],
+          ),
+        ),
       );
     }
 
     if (_errorMessage != null) {
       return Scaffold(
+        backgroundColor: AppColors.surface,
         appBar: AppBar(title: const Text('Error')),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(KoshikaSpacing.xxl),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                const SizedBox(height: 16),
+                const Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: AppColors.error,
+                ),
+                const SizedBox(height: KoshikaSpacing.base),
                 Text(
                   _errorMessage!,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge,
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: KoshikaSpacing.base),
                 FilledButton.icon(
                   onPressed: () {
                     setState(() {
@@ -111,6 +157,7 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
 
     if (history.isEmpty) {
       return Scaffold(
+        backgroundColor: AppColors.surface,
         appBar: AppBar(title: const Text('Biomarker Details')),
         body: const Center(
           child: Text('No data available for this biomarker.'),
@@ -118,174 +165,182 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
       );
     }
 
-    // The most recent result is the first in the list (since it's ordered descending by date)
     final latestResult = history.first;
     final hasNumericValues = history.any((r) => r.value != null);
 
     return Scaffold(
+      backgroundColor: AppColors.surface,
       appBar: AppBar(title: Text(latestResult.displayName)),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(KoshikaSpacing.base),
         children: [
-          // Header Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          latestResult.displayName,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (latestResult.category != null)
-                        Chip(
-                          label: Text(
-                            latestResult.category!,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          backgroundColor: theme.colorScheme.primaryContainer,
-                          side: BorderSide.none,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            latestResult.formattedValue,
-                            style: theme.textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (latestResult.unit != null)
-                            Text(
-                              latestResult.unit!,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: AppColors.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
-                      FlagBadge(flag: latestResult.flag),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  ReferenceRangeGauge(
-                    value: latestResult.value,
-                    refLow: latestResult.refLow,
-                    refHigh: latestResult.refHigh,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Reference Range: ${latestResult.formattedRefRange}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (latestResult.loincCode != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4.0),
-                      child: Text(
-                        'LOINC: ${latestResult.loincCode}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.7,
-                          ),
-                        ),
+          // ── Header Card ─────────────────────────────────────────────
+          Container(
+            decoration: KoshikaDecorations.card,
+            padding: KoshikaSpacing.cardPaddingAsymmetric,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Metric label
+                Text(
+                  'LATEST RESULT • ${DateFormat('MMM d').format(latestResult.testDate).toUpperCase()}',
+                  style: KoshikaTypography.metricLabel,
+                ),
+                const SizedBox(height: KoshikaSpacing.md),
+
+                // Hero value
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      latestResult.formattedValue,
+                      style: KoshikaTypography.heroMetric.copyWith(
+                        color: AppColors.primary,
                       ),
                     ),
-                ],
-              ),
+                    const SizedBox(width: KoshikaSpacing.sm),
+                    if (latestResult.unit != null)
+                      Text(
+                        latestResult.unit!,
+                        style: KoshikaTypography.metricUnit,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: KoshikaSpacing.md),
+
+                // Status badge
+                StatusBadge(flag: latestResult.flag),
+
+                const SizedBox(height: KoshikaSpacing.lg),
+
+                // Reference gauge
+                Text('REFERENCE RANGE', style: KoshikaTypography.metricLabel),
+                const SizedBox(height: KoshikaSpacing.sm),
+                ReferenceRangeGauge(
+                  value: latestResult.value,
+                  refLow: latestResult.refLow,
+                  refHigh: latestResult.refHigh,
+                ),
+                const SizedBox(height: KoshikaSpacing.xs),
+                Text(
+                  latestResult.formattedRefRange,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+
+                if (latestResult.loincCode != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: KoshikaSpacing.xs),
+                    child: Text(
+                      'LOINC: ${latestResult.loincCode}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: KoshikaSpacing.xl),
 
-          // Trend Chart Section
+          // ── Trend Section ───────────────────────────────────────────
           Row(
             children: [
               Text(
                 'Trend',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: KoshikaTypography.sectionHeader.copyWith(fontSize: 20),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: KoshikaSpacing.sm),
               if (!hasNumericValues)
                 Expanded(
                   child: Text(
                     '(No numeric data to chart)',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: KoshikaSpacing.base),
 
           if (hasNumericValues) BiomarkerTrendChart(history: history),
+          if (hasNumericValues) const SizedBox(height: KoshikaSpacing.xl),
 
-          if (hasNumericValues) const SizedBox(height: 24),
-
-          // History List
+          // ── History Section ─────────────────────────────────────────
           Text(
             'History',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: KoshikaTypography.sectionHeader.copyWith(fontSize: 20),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: KoshikaSpacing.base),
 
-          Card(
+          // History list with alternating backgrounds
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: KoshikaRadius.xxl,
+            ),
             clipBehavior: Clip.antiAlias,
-            child: ListView.separated(
+            child: ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: history.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final result = history[index];
                 final report = result.report.target;
-                final rowColor = _flagRowColor(result.flag);
+                // Alternating row backgrounds
+                final bgColor = index.isEven
+                    ? AppColors.surfaceContainerLowest
+                    : AppColors.surfaceContainerLow;
 
                 return Container(
-                  color: rowColor,
-                  child: ListTile(
-                    title: Row(
-                      children: [
-                        Text(
-                          '${result.formattedValue} ${result.unit ?? ""}',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                  color: bgColor,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: KoshikaSpacing.lg,
+                    vertical: KoshikaSpacing.md,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              DateFormat.yMMMd().format(result.testDate),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              report?.labName ?? 'Unknown Lab',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        FlagBadge(flag: result.flag),
-                      ],
-                    ),
-                    subtitle: Text(
-                      '${DateFormat.yMMMd().format(result.testDate)} • ${report?.labName ?? "Unknown Lab"}',
-                    ),
+                      ),
+                      Text(
+                        '${result.formattedValue} ${result.unit ?? ""}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: KoshikaSpacing.md),
+                      FlagBadge(flag: result.flag),
+                    ],
                   ),
                 );
               },
@@ -294,23 +349,5 @@ class _BiomarkerDetailScreenState extends State<BiomarkerDetailScreen> {
         ],
       ),
     );
-  }
-
-  /// Map a [BiomarkerFlag] to a subtle row background color.
-  Color _flagRowColor(BiomarkerFlag flag) {
-    switch (flag) {
-      case BiomarkerFlag.normal:
-        return AppColors.statusActive.withValues(alpha: 0.06);
-      case BiomarkerFlag.borderline:
-        return AppColors.statusBusy.withValues(alpha: 0.08);
-      case BiomarkerFlag.low:
-        return AppColors.statusBusy.withValues(alpha: 0.08);
-      case BiomarkerFlag.high:
-        return AppColors.error.withValues(alpha: 0.07);
-      case BiomarkerFlag.critical:
-        return AppColors.error.withValues(alpha: 0.12);
-      case BiomarkerFlag.unknown:
-        return Colors.transparent;
-    }
   }
 }

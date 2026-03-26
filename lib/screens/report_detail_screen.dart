@@ -6,6 +6,8 @@ import 'package:path/path.dart' as p;
 
 import '../main.dart';
 import '../models/models.dart';
+import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 import 'biomarker_detail_screen.dart';
 import '../widgets/flag_badge.dart';
 import '../services/fhir_export_service.dart';
@@ -103,27 +105,35 @@ class ReportDetailScreen extends StatelessWidget {
       body: results.isEmpty
           ? Center(
               child: Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(KoshikaSpacing.xxl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 80,
-                      color: theme.colorScheme.error.withValues(alpha: 0.5),
+                    Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        color: AppColors.errorContainer.withValues(alpha: 0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: AppColors.error,
+                      ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: KoshikaSpacing.xl),
                     Text(
                       'No biomarkers extracted',
-                      style: theme.textTheme.headlineSmall,
+                      style: KoshikaTypography.sectionHeader.copyWith(
+                        color: AppColors.onSurface,
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: KoshikaSpacing.sm),
                     Text(
                       'We could not parse any structured data from this report. This may be an unsupported lab format.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
+                        color: AppColors.onSurfaceVariant,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -132,59 +142,63 @@ class ReportDetailScreen extends StatelessWidget {
               ),
             )
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(KoshikaSpacing.base),
               children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${results.length} Biomarkers extracted',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                Container(
+                  decoration: KoshikaDecorations.card,
+                  padding: KoshikaSpacing.cardPaddingAsymmetric,
+                  child: Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${results.length} Biomarkers extracted',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.onSurface,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              outOfRangeCount > 0
-                                  ? '$outOfRangeCount out of range'
-                                  : 'All within range ✓',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: outOfRangeCount > 0
-                                    ? theme.colorScheme.error
-                                    : Colors.green,
-                                fontWeight: FontWeight.w500,
-                              ),
+                          ),
+                          const SizedBox(height: KoshikaSpacing.xs),
+                          Text(
+                            outOfRangeCount > 0
+                                ? '$outOfRangeCount out of range'
+                                : 'All within range',
+                            style: KoshikaTypography.statusText.copyWith(
+                              color: outOfRangeCount > 0
+                                  ? AppColors.error
+                                  : AppColors.success,
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: KoshikaSpacing.base),
                 ...groupedResults.entries.map((entry) {
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Card(
+                    padding: const EdgeInsets.only(bottom: KoshikaSpacing.base),
+                    child: Container(
+                      decoration: KoshikaDecorations.card,
+                      clipBehavior: Clip.antiAlias,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            padding: const EdgeInsets.fromLTRB(
+                              KoshikaSpacing.base,
+                              KoshikaSpacing.base,
+                              KoshikaSpacing.base,
+                              KoshikaSpacing.sm,
+                            ),
                             child: Text(
-                              entry.key,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.bold,
+                              entry.key.toUpperCase(),
+                              style: KoshikaTypography.metricLabel.copyWith(
+                                color: AppColors.primary,
                               ),
                             ),
                           ),
-                          const Divider(height: 1),
                           ...entry.value.map(
                             (r) => ListTile(
                               onTap: () => Navigator.of(context).push(
@@ -194,8 +208,19 @@ class ReportDetailScreen extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              title: Text(r.displayName),
-                              subtitle: Text('Range: ${r.formattedRefRange}'),
+                              title: Text(
+                                r.displayName,
+                                style: const TextStyle(
+                                  color: AppColors.onSurface,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Range: ${r.formattedRefRange}',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -204,14 +229,19 @@ class ReportDetailScreen extends StatelessWidget {
                                     style: theme.textTheme.titleMedium
                                         ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
-                                  Text(r.unit ?? ''),
-                                  const SizedBox(width: 8),
+                                  Text(
+                                    r.unit ?? '',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: KoshikaSpacing.sm),
                                   FlagBadge(flag: r.flag),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: KoshikaSpacing.xs),
                                   const Icon(
                                     Icons.chevron_right,
                                     size: 20,
-                                    color: Colors.grey,
+                                    color: AppColors.onSurfaceVariant,
                                   ),
                                 ],
                               ),

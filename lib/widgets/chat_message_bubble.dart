@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/chat_message.dart';
+import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 
 /// Renders a single chat message with role-based styling.
 ///
-/// - User messages: right-aligned, primary-color bubble
-/// - Assistant messages: left-aligned, surface-variant bubble
+/// - User messages: right-aligned, primary-color bubble, 24px radius
+/// - Assistant messages: left-aligned, surface bubble with 4px left accent strip
 /// - Error messages: left-aligned, error-container bubble
 /// - Streaming messages: show animated "..." indicator at the end
 class ChatMessageBubble extends StatelessWidget {
@@ -16,30 +18,22 @@ class ChatMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isUser = message.role == ChatRole.user;
     final isError = message.isError;
 
     final alignment = isUser ? Alignment.centerRight : Alignment.centerLeft;
 
-    final borderRadius = BorderRadius.only(
-      topLeft: const Radius.circular(16),
-      topRight: const Radius.circular(16),
-      bottomLeft: isUser ? const Radius.circular(16) : Radius.zero,
-      bottomRight: isUser ? Radius.zero : const Radius.circular(16),
-    );
-
     Color bubbleColor;
     Color textColor;
     if (isError) {
-      bubbleColor = theme.colorScheme.errorContainer;
-      textColor = theme.colorScheme.onErrorContainer;
+      bubbleColor = AppColors.errorContainer;
+      textColor = AppColors.onErrorContainer;
     } else if (isUser) {
-      bubbleColor = theme.colorScheme.primary;
-      textColor = theme.colorScheme.onPrimary;
+      bubbleColor = AppColors.primary;
+      textColor = Colors.white;
     } else {
-      bubbleColor = theme.colorScheme.surfaceContainerHighest;
-      textColor = theme.colorScheme.onSurface;
+      bubbleColor = AppColors.surfaceContainerLowest;
+      textColor = AppColors.onSurface;
     }
 
     return Align(
@@ -48,35 +42,54 @@ class ChatMessageBubble extends StatelessWidget {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.8,
         ),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(vertical: KoshikaSpacing.xs),
+        padding: const EdgeInsets.symmetric(
+          horizontal: KoshikaSpacing.base,
+          vertical: KoshikaSpacing.md,
+        ),
         decoration: BoxDecoration(
           color: bubbleColor,
-          borderRadius: borderRadius,
+          borderRadius: KoshikaRadius.xxl,
+          border: (!isUser && !isError)
+              ? const Border(
+                  left: BorderSide(color: AppColors.primary, width: 4),
+                )
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            // AI label for assistant messages
+            if (!isUser && !isError)
+              Padding(
+                padding: const EdgeInsets.only(bottom: KoshikaSpacing.xs),
+                child: Text(
+                  'KOSHIKA INTELLIGENCE',
+                  style: KoshikaTypography.metricLabel.copyWith(
+                    color: AppColors.primary,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+
             // Error icon row
             if (isError)
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(bottom: KoshikaSpacing.xs),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.error_outline,
                       size: 16,
-                      color: theme.colorScheme.error,
+                      color: AppColors.error,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: KoshikaSpacing.xs),
                     Text(
                       'Error',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.error,
+                      style: KoshikaTypography.statusText.copyWith(
+                        color: AppColors.error,
                       ),
                     ),
                   ],
@@ -95,7 +108,7 @@ class ChatMessageBubble extends StatelessWidget {
             // Streaming indicator appended to text
             if (message.content.isNotEmpty && message.isStreaming)
               Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.only(top: KoshikaSpacing.xs),
                 child: _StreamingDots(color: textColor),
               ),
 
@@ -154,7 +167,6 @@ class _StreamingDotsState extends State<_StreamingDots>
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(3, (index) {
-            // Each dot pulses with a phase offset
             final delay = index * 0.2;
             final t = (_controller.value - delay).clamp(0.0, 1.0);
             final opacity = (0.3 + 0.7 * _pulseValue(t));
@@ -179,7 +191,6 @@ class _StreamingDotsState extends State<_StreamingDots>
   }
 
   double _pulseValue(double t) {
-    // Simple sine-like pulse: goes 0 → 1 → 0 over a cycle
     if (t < 0.5) return t * 2;
     return (1 - t) * 2;
   }

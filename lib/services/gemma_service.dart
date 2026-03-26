@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 
 import '../constants/ai_prompts.dart';
@@ -62,6 +63,7 @@ class GemmaService {
   // ═══════════════════════════════════════════════════════════════════
 
   /// Check if the model is already installed on disk.
+  /// If found, re-registers it with the SDK so [loadModel] works immediately.
   /// Called once during app startup. Must never throw.
   Future<void> initialize() async {
     try {
@@ -74,12 +76,24 @@ class GemmaService {
       );
 
       if (isInstalled) {
+        // Re-register with the SDK so getActiveModel() works without
+        // needing a redundant "download" tap. The SDK detects the file
+        // already exists and skips the actual download.
+        try {
+          await FlutterGemma.installModel(
+            modelType: ModelType.gemmaIt,
+          ).fromNetwork(_modelUrl).install();
+        } catch (e) {
+          debugPrint('GemmaService: SDK re-registration skipped ($e)');
+        }
+
         _updateStatus(
           _modelInfo.copyWith(status: ModelStatus.ready, downloadProgress: 100),
         );
       }
       // else: stays at notDownloaded (default)
     } catch (e) {
+      debugPrint('GemmaService.initialize: $e');
       // Non-fatal — default to notDownloaded so the user can still try
       _updateStatus(
         _modelInfo.copyWith(

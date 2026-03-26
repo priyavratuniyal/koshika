@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
+
 /// Key used in SharedPreferences to track onboarding completion.
 const kOnboardingCompleteKey = 'onboarding_complete';
 
@@ -83,9 +86,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
+      backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -93,11 +95,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Align(
               alignment: Alignment.topRight,
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(KoshikaSpacing.base),
                 child: _currentPage < _pages.length - 1
                     ? TextButton(
                         onPressed: _completeOnboarding,
-                        child: const Text('Skip'),
+                        child: Text(
+                          'Skip',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
                       )
                     : const SizedBox(height: 40),
               ),
@@ -119,42 +124,66 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
             // Page indicator dots
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
+              padding: const EdgeInsets.symmetric(vertical: KoshikaSpacing.xl),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_pages.length, (index) {
                   final isActive = index == _currentPage;
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: KoshikaSpacing.xs,
+                    ),
                     width: isActive ? 24 : 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: KoshikaRadius.sm,
                       color: isActive
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.outlineVariant,
+                          ? AppColors.primary
+                          : AppColors.outlineVariant,
                     ),
                   );
                 }),
               ),
             ),
 
-            // Action button
+            // Action button — gradient pill CTA
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
+              padding: const EdgeInsets.fromLTRB(
+                KoshikaSpacing.xl,
+                0,
+                KoshikaSpacing.xl,
+                KoshikaSpacing.xxxl,
+              ),
               child: SizedBox(
                 width: double.infinity,
                 height: 52,
-                child: FilledButton(
-                  onPressed: _currentPage == _pages.length - 1
-                      ? _completeOnboarding
-                      : _goToNextPage,
-                  child: Text(
-                    _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, Color(0xFF0D9488)],
+                    ),
+                    borderRadius: KoshikaRadius.pill,
+                    boxShadow: KoshikaElevation.medium,
+                  ),
+                  child: FilledButton(
+                    onPressed: _currentPage == _pages.length - 1
+                        ? _completeOnboarding
+                        : _goToNextPage,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Text(
+                      _currentPage == _pages.length - 1
+                          ? 'Get Started'
+                          : 'Next',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -195,7 +224,7 @@ class _OnboardingPage extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: const EdgeInsets.symmetric(horizontal: KoshikaSpacing.xxxl),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -204,36 +233,33 @@ class _OnboardingPage extends StatelessWidget {
             height: 120,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: theme.colorScheme.primaryContainer,
+              color: AppColors.primaryContainer.withValues(alpha: 0.15),
             ),
-            child: Icon(
-              data.icon,
-              size: 56,
-              color: theme.colorScheme.onPrimaryContainer,
-            ),
+            child: Icon(data.icon, size: 56, color: AppColors.primary),
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: KoshikaSpacing.xxxl),
           Text(
             data.title,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
+            style: KoshikaTypography.sectionHeader.copyWith(
+              fontSize: 28,
+              color: AppColors.onSurface,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: KoshikaSpacing.sm),
           Text(
             data.subtitle,
             style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.primary,
+              color: AppColors.primary,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: KoshikaSpacing.xl),
           Text(
             data.description,
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              color: AppColors.textSecondary,
               height: 1.6,
             ),
             textAlign: TextAlign.center,
