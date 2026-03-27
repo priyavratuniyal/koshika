@@ -1,7 +1,6 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
 
 import 'screens/chat_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -11,8 +10,8 @@ import 'screens/settings_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/objectbox_store.dart';
 import 'services/biomarker_dictionary.dart';
-import 'services/embedding_service.dart';
-import 'services/gemma_service.dart';
+import 'services/llm_embedding_service.dart';
+import 'services/llm_service.dart';
 import 'services/vector_store_service.dart';
 import 'theme/app_colors.dart';
 import 'theme/koshika_design_system.dart';
@@ -20,13 +19,22 @@ import 'theme/koshika_design_system.dart';
 /// Global references — initialized in SplashScreen before navigation.
 late ObjectBoxStore objectbox;
 late BiomarkerDictionary biomarkerDictionary;
-late GemmaService gemmaService;
-late EmbeddingService embeddingService;
+late LlmService llmService;
+late LlmEmbeddingService embeddingService;
 late VectorStoreService vectorStoreService;
 
-Future<void> main() async {
+/// Whether AI features are enabled. Set by the entry point
+/// (main_full.dart vs main_lite.dart).
+bool kAiEnabled = true;
+
+/// Default entry point — full flavor with AI enabled.
+/// For flavor-specific builds, use main_full.dart or main_lite.dart.
+Future<void> main() async => appMain(aiEnabled: true);
+
+/// Shared app bootstrap — called from entry-point files.
+Future<void> appMain({required bool aiEnabled}) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await FlutterGemma.initialize(maxDownloadRetries: 5);
+  kAiEnabled = aiEnabled;
   runApp(const KoshikaApp());
 }
 
@@ -123,19 +131,19 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
+  /// Screens available depends on whether AI is enabled.
+  List<Widget> get _screens => kAiEnabled
+      ? const [
+          DashboardScreen(),
+          ReportsScreen(),
+          ChatScreen(),
+          SettingsScreen(),
+        ]
+      : const [DashboardScreen(), ReportsScreen(), SettingsScreen()];
+
   Widget _buildCurrentScreen() {
-    switch (_currentIndex) {
-      case 0:
-        return const DashboardScreen();
-      case 1:
-        return const ReportsScreen();
-      case 2:
-        return const ChatScreen();
-      case 3:
-        return const SettingsScreen();
-      default:
-        return const DashboardScreen();
-    }
+    if (_currentIndex < _screens.length) return _screens[_currentIndex];
+    return const DashboardScreen();
   }
 
   @override
@@ -175,21 +183,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: 'Reports',
                       onTap: () => setState(() => _currentIndex = 1),
                     ),
+                    if (kAiEnabled)
+                      _NavItem(
+                        index: 2,
+                        currentIndex: _currentIndex,
+                        icon: Icons.chat_outlined,
+                        activeIcon: Icons.chat,
+                        label: 'Chat',
+                        onTap: () => setState(() => _currentIndex = 2),
+                      ),
                     _NavItem(
-                      index: 2,
-                      currentIndex: _currentIndex,
-                      icon: Icons.chat_outlined,
-                      activeIcon: Icons.chat,
-                      label: 'Chat',
-                      onTap: () => setState(() => _currentIndex = 2),
-                    ),
-                    _NavItem(
-                      index: 3,
+                      index: kAiEnabled ? 3 : 2,
                       currentIndex: _currentIndex,
                       icon: Icons.settings_outlined,
                       activeIcon: Icons.settings,
                       label: 'Settings',
-                      onTap: () => setState(() => _currentIndex = 3),
+                      onTap: () =>
+                          setState(() => _currentIndex = kAiEnabled ? 3 : 2),
                     ),
                   ],
                 ),

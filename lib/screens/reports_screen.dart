@@ -144,7 +144,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       if (importResult.success) {
         // Index new results in VectorStore for semantic search
-        if (importResult.report != null && vectorStoreService.isReady) {
+        if (kAiEnabled &&
+            importResult.report != null &&
+            vectorStoreService.isReady) {
           final newResults = objectbox.getResultsForReport(
             importResult.report!.id,
           );

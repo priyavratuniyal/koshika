@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../models/llm_model_config.dart';
 import '../models/model_info.dart';
 import '../services/objectbox_store.dart';
 import '../services/biomarker_dictionary.dart';
-import '../services/embedding_service.dart';
-import '../services/gemma_service.dart';
+import '../services/llm_embedding_service.dart';
+import '../services/llm_service.dart';
 import '../services/vector_store_service.dart';
 import '../main.dart' as app_main;
 import 'onboarding_screen.dart';
@@ -12,7 +13,7 @@ import 'onboarding_screen.dart';
 /// Animated splash screen shown during app initialization.
 ///
 /// Displays a branded launch experience while ObjectBox, the biomarker
-/// dictionary, and the Gemma service are initializing in the background.
+/// dictionary, and AI services are initializing in the background.
 /// After initialization, navigates to [OnboardingScreen] or [HomeScreen]
 /// based on whether the user has completed onboarding.
 class SplashScreen extends StatefulWidget {
@@ -58,40 +59,39 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initializeApp() async {
     try {
-      // Initialize ObjectBox
+      // Core services — always needed
       app_main.objectbox = await ObjectBoxStore.create();
 
-      // Load biomarker dictionary
       app_main.biomarkerDictionary = BiomarkerDictionary();
       await app_main.biomarkerDictionary.load();
 
-      // Create default patient profile
       app_main.objectbox.getOrCreateDefaultPatient();
 
-      // Initialize Gemma service (checks if model exists on disk — never blocks)
-      app_main.gemmaService = GemmaService();
-      await app_main.gemmaService.initialize();
+      // AI services — only when enabled (full flavor)
+      if (app_main.kAiEnabled) {
+        app_main.llmService = LlmService(LlmModelRegistry.defaultModel);
+        await app_main.llmService.initialize();
 
-      // Initialize embedding + vector store services
-      app_main.embeddingService = EmbeddingService();
-      await app_main.embeddingService.initialize();
+        app_main.embeddingService = LlmEmbeddingService();
+        await app_main.embeddingService.initialize();
 
-      app_main.vectorStoreService = VectorStoreService(
-        app_main.embeddingService,
-      );
-      await app_main.vectorStoreService.initialize();
+        app_main.vectorStoreService = VectorStoreService(
+          app_main.embeddingService,
+        );
 
-      // Kick off model loading in the background if already downloaded.
-      // These are unawaited — navigation proceeds immediately, models finish
-      // loading while the user is on the home screen.
-      if (app_main.gemmaService.currentModelInfo.status == ModelStatus.ready) {
-        // ignore: unawaited_futures
-        app_main.gemmaService.loadModel();
-      }
-      if (app_main.embeddingService.currentModelInfo.status ==
-          ModelStatus.ready) {
-        // ignore: unawaited_futures
-        app_main.embeddingService.loadModel();
+        // Auto-load models if already downloaded
+        if (app_main.llmService.currentModelInfo.status == ModelStatus.ready) {
+          // ignore: unawaited_futures
+          app_main.llmService.loadModel();
+        }
+        if (app_main.embeddingService.currentModelInfo.status ==
+            ModelStatus.ready) {
+          // ignore: unawaited_futures
+          app_main.embeddingService.loadModel().then((_) {
+            // Re-embed any results that have stale or missing embeddings
+            _migrateEmbeddingsIfNeeded();
+          });
+        }
       }
 
       // Ensure animation has played for at least 1.5 seconds
@@ -117,6 +117,35 @@ class _SplashScreenState extends State<SplashScreen>
               'Something went wrong during startup. Please restart the app.';
         });
       }
+    }
+  }
+
+  /// One-time migration: recompute all embeddings when the embedding
+  /// dimension changes (768 → 384 after flutter_gemma → llama_cpp_dart).
+  Future<void> _migrateEmbeddingsIfNeeded() async {
+    if (!app_main.kAiEnabled) return;
+    if (!app_main.embeddingService.isLoaded) return;
+
+    try {
+      final allResults = app_main.objectbox.biomarkerResultBox.getAll();
+      if (allResults.isEmpty) return;
+
+      // Check if any result has stale (768-dim) or missing embeddings
+      final needsMigration = allResults.any(
+        (r) =>
+            r.embedding == null ||
+            r.embedding!.isEmpty ||
+            r.embedding!.length != 384,
+      );
+
+      if (needsMigration) {
+        debugPrint(
+          'SplashScreen: migrating ${allResults.length} embeddings to 384-dim',
+        );
+        await app_main.vectorStoreService.rebuildIndex(allResults);
+      }
+    } catch (e) {
+      debugPrint('Embedding migration failed (non-fatal): $e');
     }
   }
 

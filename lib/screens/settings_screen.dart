@@ -11,7 +11,7 @@ import '../main.dart';
 import '../theme/app_colors.dart';
 import '../theme/koshika_design_system.dart';
 import '../models/models.dart';
-import '../services/embedding_service.dart';
+import '../models/llm_model_config.dart';
 import '../services/fhir_export_service.dart';
 import '../widgets/icon_container.dart';
 
@@ -24,23 +24,35 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late StreamSubscription<ModelInfo> _modelSub;
-  late StreamSubscription<ModelInfo> _embeddingSub;
-  late ModelInfo _modelInfo;
-  late ModelInfo _embeddingInfo;
+  StreamSubscription<ModelInfo>? _modelSub;
+  StreamSubscription<ModelInfo>? _embeddingSub;
+  ModelInfo _modelInfo = const ModelInfo(
+    name: '',
+    downloadUrl: '',
+    estimatedSizeMB: 0,
+  );
+  ModelInfo _embeddingInfo = const ModelInfo(
+    name: '',
+    downloadUrl: '',
+    estimatedSizeMB: 0,
+  );
   String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
-    _modelInfo = gemmaService.currentModelInfo;
-    _embeddingInfo = embeddingService.currentModelInfo;
-    _modelSub = gemmaService.modelStatusStream.listen((info) {
-      if (mounted) setState(() => _modelInfo = info);
-    });
-    _embeddingSub = embeddingService.modelStatusStream.listen((info) {
-      if (mounted) setState(() => _embeddingInfo = info);
-    });
+
+    if (kAiEnabled) {
+      _modelInfo = llmService.currentModelInfo;
+      _embeddingInfo = embeddingService.currentModelInfo;
+      _modelSub = llmService.modelStatusStream.listen((info) {
+        if (mounted) setState(() => _modelInfo = info);
+      });
+      _embeddingSub = embeddingService.modelStatusStream.listen((info) {
+        if (mounted) setState(() => _embeddingInfo = info);
+      });
+    }
+
     _loadAppVersion();
   }
 
@@ -57,39 +69,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    _modelSub.cancel();
-    _embeddingSub.cancel();
+    _modelSub?.cancel();
+    _embeddingSub?.cancel();
     super.dispose();
   }
 
-  // ─── Embedding Model ────────────────────────────────────────────────
+  // ─── Model Actions ───────────────────────────────────────────────────
 
-  Future<void> _downloadEmbeddingModel() async {
-    final token = await _getOrPromptHfToken();
-    if (token == null || token.isEmpty) return;
-    await embeddingService.downloadModel(hfToken: token);
-  }
+  Future<void> _onModelSelected(LlmModelConfig config) async {
+    if (config.id == llmService.currentConfig.id && !config.isCustom) return;
 
-  Future<void> _downloadGemmaModel() async {
-    final token = await _getOrPromptHfToken();
-    if (token == null || token.isEmpty) return;
-    await gemmaService.downloadModel(hfToken: token);
-  }
-
-  Future<String?> _getOrPromptHfToken() async {
-    var token = await EmbeddingService.getHfToken();
-
-    if (token == null || token.isEmpty) {
-      if (!mounted) return null;
-      token = await showDialog<String>(
+    // Warn if switching away from a downloaded model
+    if (_modelInfo.status != ModelStatus.notDownloaded) {
+      final confirmed = await showDialog<bool>(
         context: context,
-        builder: (ctx) => _HfTokenDialog(),
+        builder: (ctx) => AlertDialog(
+          title: const Text('Switch Model?'),
+          content: Text(
+            'Switching will remove ${_modelInfo.name} '
+            '(~${_modelInfo.formattedSize}) from this device. '
+            'The new model will need to be downloaded.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Switch'),
+            ),
+          ],
+        ),
       );
-      if (token == null || token.isEmpty) return null;
-      await EmbeddingService.saveHfToken(token);
+      if (confirmed != true || !mounted) return;
     }
 
-    return token;
+    await llmService.switchModel(config);
+  }
+
+  Future<void> _onCustomModelTap() async {
+    if (!mounted) return;
+    final result = await showDialog<LlmModelConfig>(
+      context: context,
+      builder: (ctx) => const _CustomModelDialog(),
+    );
+    if (result != null) await _onModelSelected(result);
   }
 
   // ─── Data Actions ───────────────────────────────────────────────────
@@ -210,22 +235,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: KoshikaSpacing.base),
         children: [
-          // ── AI Model Section ──
-          _SectionHeader(title: 'AI Models', icon: Icons.smart_toy_outlined),
-          _ModelStatusTile(
-            modelInfo: _modelInfo,
-            onDownload: _downloadGemmaModel,
-            onLoad: () => gemmaService.loadModel(),
-            onUnload: () => gemmaService.unloadModel(),
-          ),
-          _EmbeddingModelTile(
-            modelInfo: _embeddingInfo,
-            onDownload: _downloadEmbeddingModel,
-            onLoad: () => embeddingService.loadModel(),
-            onUnload: () => embeddingService.unloadModel(),
-          ),
-
-          const SizedBox(height: KoshikaSpacing.sm),
+          // ── AI Model Section (full flavor only) ──
+          if (kAiEnabled) ...[
+            _SectionHeader(title: 'AI Models', icon: Icons.smart_toy_outlined),
+            _ModelPickerSection(
+              modelInfo: _modelInfo,
+              currentConfig: llmService.currentConfig,
+              onModelSelected: _onModelSelected,
+              onCustomModelTap: _onCustomModelTap,
+              onDownload: () => llmService.downloadModel(),
+              onLoad: () => llmService.loadModel(),
+              onUnload: () => llmService.unloadModel(),
+              onCancelDownload: () => llmService.cancelDownload(),
+            ),
+            const SizedBox(height: KoshikaSpacing.sm),
+            _EmbeddingModelTile(
+              modelInfo: _embeddingInfo,
+              onDownload: () => embeddingService.downloadModel(),
+              onLoad: () => embeddingService.loadModel(),
+              onUnload: () => embeddingService.unloadModel(),
+            ),
+            const SizedBox(height: KoshikaSpacing.sm),
+          ],
 
           // ── Data Section ──
           _SectionHeader(
@@ -360,7 +391,7 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Settings Row (replaces ListTile)
+// Settings Row
 // ═══════════════════════════════════════════════════════════════════════
 
 class _SettingsRow extends StatelessWidget {
@@ -434,20 +465,195 @@ class _SettingsRow extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Model Status Tile
+// Model Picker Section — curated list + active model controls
 // ═══════════════════════════════════════════════════════════════════════
 
-class _ModelStatusTile extends StatelessWidget {
+class _ModelPickerSection extends StatelessWidget {
+  final ModelInfo modelInfo;
+  final LlmModelConfig currentConfig;
+  final ValueChanged<LlmModelConfig> onModelSelected;
+  final VoidCallback onCustomModelTap;
+  final VoidCallback onDownload;
+  final VoidCallback onLoad;
+  final VoidCallback onUnload;
+  final VoidCallback onCancelDownload;
+
+  const _ModelPickerSection({
+    required this.modelInfo,
+    required this.currentConfig,
+    required this.onModelSelected,
+    required this.onCustomModelTap,
+    required this.onDownload,
+    required this.onLoad,
+    required this.onUnload,
+    required this.onCancelDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: KoshikaDecorations.card,
+      padding: KoshikaSpacing.cardPaddingAsymmetric,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Chat Model',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: KoshikaSpacing.sm),
+
+          // Curated model options
+          ...LlmModelRegistry.curated.map(
+            (config) => _ModelOptionCard(
+              config: config,
+              isSelected: config.id == currentConfig.id,
+              onTap: () => onModelSelected(config),
+            ),
+          ),
+
+          // Custom model option
+          _ModelOptionCard(
+            config: LlmModelConfig(
+              id: 'custom',
+              name: 'Custom model',
+              downloadUrl: '',
+              estimatedSizeMB: 0,
+              description: 'Use any GGUF URL',
+              isCustom: true,
+            ),
+            isSelected: currentConfig.isCustom,
+            onTap: onCustomModelTap,
+          ),
+
+          const SizedBox(height: KoshikaSpacing.md),
+
+          // Active model controls
+          _ActiveModelControls(
+            modelInfo: modelInfo,
+            onDownload: onDownload,
+            onLoad: onLoad,
+            onUnload: onUnload,
+            onCancelDownload: onCancelDownload,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Single selectable model row (radio-style)
+// ═══════════════════════════════════════════════════════════════════════
+
+class _ModelOptionCard extends StatelessWidget {
+  final LlmModelConfig config;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ModelOptionCard({
+    required this.config,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: KoshikaSpacing.xs),
+      child: InkWell(
+        borderRadius: KoshikaRadius.md,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: KoshikaSpacing.md,
+            vertical: KoshikaSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: KoshikaRadius.md,
+            border: Border.all(
+              color: isSelected
+                  ? AppColors.primary
+                  : AppColors.outlineVariant.withValues(alpha: 0.5),
+              width: isSelected ? 1.5 : 1,
+            ),
+            color: isSelected
+                ? AppColors.primaryContainer.withValues(alpha: 0.08)
+                : Colors.transparent,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isSelected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                size: 20,
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.onSurfaceVariant,
+              ),
+              const SizedBox(width: KoshikaSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      config.name,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                    Text(
+                      config.description,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (config.estimatedSizeMB > 0)
+                Text(
+                  config.formattedSize,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Active model controls — Download / Load / Unload + progress
+// ═══════════════════════════════════════════════════════════════════════
+
+class _ActiveModelControls extends StatelessWidget {
   final ModelInfo modelInfo;
   final VoidCallback onDownload;
   final VoidCallback onLoad;
   final VoidCallback onUnload;
+  final VoidCallback onCancelDownload;
 
-  const _ModelStatusTile({
+  const _ActiveModelControls({
     required this.modelInfo,
     required this.onDownload,
     required this.onLoad,
     required this.onUnload,
+    required this.onCancelDownload,
   });
 
   @override
@@ -455,105 +661,80 @@ class _ModelStatusTile extends StatelessWidget {
     final theme = Theme.of(context);
     final statusColor = _statusColor;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: KoshikaSpacing.sm),
-      child: Container(
-        decoration: KoshikaDecorations.card,
-        padding: KoshikaSpacing.cardPaddingAsymmetric,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Status badge
+        Row(
           children: [
-            Row(
-              children: [
-                Icon(_statusIcon, color: statusColor, size: 20),
-                const SizedBox(width: KoshikaSpacing.sm),
-                Expanded(
-                  child: Text(
-                    modelInfo.name,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.onSurface,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: KoshikaSpacing.sm,
-                    vertical: KoshikaSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: KoshikaRadius.md,
-                  ),
-                  child: Text(
-                    _statusLabel,
-                    style: KoshikaTypography.statusText.copyWith(
-                      color: statusColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: KoshikaSpacing.sm),
+            Icon(_statusIcon, color: statusColor, size: 16),
+            const SizedBox(width: KoshikaSpacing.xs),
             Text(
-              'Size: ${modelInfo.formattedSize}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            if (modelInfo.status == ModelStatus.downloading) ...[
-              const SizedBox(height: KoshikaSpacing.md),
-              LinearProgressIndicator(
-                value: modelInfo.downloadProgress / 100,
-                borderRadius: KoshikaRadius.sm,
-              ),
-              const SizedBox(height: KoshikaSpacing.xs),
-              Text(
-                '${modelInfo.downloadProgress}%',
-                style: theme.textTheme.labelSmall,
-              ),
-            ],
-            if (modelInfo.errorMessage != null) ...[
-              const SizedBox(height: KoshikaSpacing.sm),
-              Text(
-                modelInfo.errorMessage!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.error,
-                ),
-              ),
-            ],
-            const SizedBox(height: KoshikaSpacing.md),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (modelInfo.canDownload)
-                  FilledButton.icon(
-                    onPressed: onDownload,
-                    icon: const Icon(Icons.download, size: 18),
-                    label: const Text('Download'),
-                  ),
-                if (modelInfo.canLoad)
-                  FilledButton.tonal(
-                    onPressed: onLoad,
-                    child: const Text('Load Model'),
-                  ),
-                if (modelInfo.isUsable)
-                  OutlinedButton(
-                    onPressed: onUnload,
-                    child: const Text('Unload'),
-                  ),
-                if (modelInfo.status == ModelStatus.downloading ||
-                    modelInfo.status == ModelStatus.loading)
-                  const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
+              _statusLabel,
+              style: KoshikaTypography.statusText.copyWith(color: statusColor),
             ),
           ],
         ),
-      ),
+
+        // Progress bar
+        if (modelInfo.status == ModelStatus.downloading) ...[
+          const SizedBox(height: KoshikaSpacing.sm),
+          LinearProgressIndicator(
+            value: modelInfo.downloadProgress / 100,
+            borderRadius: KoshikaRadius.sm,
+          ),
+          const SizedBox(height: KoshikaSpacing.xs),
+          Text(
+            '${modelInfo.downloadProgress}%',
+            style: theme.textTheme.labelSmall,
+          ),
+        ],
+
+        // Error message
+        if (modelInfo.errorMessage != null) ...[
+          const SizedBox(height: KoshikaSpacing.sm),
+          Text(
+            modelInfo.errorMessage!,
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.error),
+          ),
+        ],
+
+        // Action buttons
+        const SizedBox(height: KoshikaSpacing.sm),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (modelInfo.canDownload)
+              FilledButton.icon(
+                onPressed: onDownload,
+                icon: const Icon(Icons.download, size: 18),
+                label: const Text('Download'),
+              ),
+            if (modelInfo.canLoad)
+              FilledButton.tonal(
+                onPressed: onLoad,
+                child: const Text('Load Model'),
+              ),
+            if (modelInfo.isUsable)
+              OutlinedButton(onPressed: onUnload, child: const Text('Unload')),
+            if (modelInfo.status == ModelStatus.downloading)
+              Padding(
+                padding: const EdgeInsets.only(left: KoshikaSpacing.sm),
+                child: OutlinedButton.icon(
+                  onPressed: onCancelDownload,
+                  icon: const Icon(Icons.close, size: 16),
+                  label: const Text('Cancel'),
+                ),
+              ),
+            if (modelInfo.status == ModelStatus.loading)
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -585,7 +766,7 @@ class _ModelStatusTile extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Embedding Model Status Tile
+// Embedding Model Tile
 // ═══════════════════════════════════════════════════════════════════════
 
 class _EmbeddingModelTile extends StatelessWidget {
@@ -606,115 +787,112 @@ class _EmbeddingModelTile extends StatelessWidget {
     final theme = Theme.of(context);
     final statusColor = _statusColor;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: KoshikaSpacing.sm),
-      child: Container(
-        decoration: KoshikaDecorations.card,
-        padding: KoshikaSpacing.cardPaddingAsymmetric,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(_statusIcon, color: statusColor, size: 20),
-                const SizedBox(width: KoshikaSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        modelInfo.name,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.onSurface,
-                        ),
+    return Container(
+      decoration: KoshikaDecorations.card,
+      padding: KoshikaSpacing.cardPaddingAsymmetric,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_statusIcon, color: statusColor, size: 20),
+              const SizedBox(width: KoshikaSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      modelInfo.name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onSurface,
                       ),
-                      Text(
-                        'Enables semantic search for AI chat',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: KoshikaSpacing.sm,
-                    vertical: KoshikaSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: KoshikaRadius.md,
-                  ),
-                  child: Text(
-                    _statusLabel,
-                    style: KoshikaTypography.statusText.copyWith(
-                      color: statusColor,
                     ),
+                    Text(
+                      'Enables semantic search for AI chat',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: KoshikaSpacing.sm,
+                  vertical: KoshikaSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: KoshikaRadius.md,
+                ),
+                child: Text(
+                  _statusLabel,
+                  style: KoshikaTypography.statusText.copyWith(
+                    color: statusColor,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: KoshikaSpacing.sm),
-            Text(
-              'Size: ${modelInfo.formattedSize}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            if (modelInfo.status == ModelStatus.downloading) ...[
-              const SizedBox(height: KoshikaSpacing.md),
-              LinearProgressIndicator(
-                value: modelInfo.downloadProgress / 100,
-                borderRadius: KoshikaRadius.sm,
-              ),
-              const SizedBox(height: KoshikaSpacing.xs),
-              Text(
-                '${modelInfo.downloadProgress}%',
-                style: theme.textTheme.labelSmall,
               ),
             ],
-            if (modelInfo.errorMessage != null) ...[
-              const SizedBox(height: KoshikaSpacing.sm),
-              Text(
-                modelInfo.errorMessage!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.error,
-                ),
-              ),
-            ],
+          ),
+          const SizedBox(height: KoshikaSpacing.sm),
+          Text(
+            'Size: ${modelInfo.formattedSize}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          if (modelInfo.status == ModelStatus.downloading) ...[
             const SizedBox(height: KoshikaSpacing.md),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (modelInfo.canDownload)
-                  FilledButton.icon(
-                    onPressed: onDownload,
-                    icon: const Icon(Icons.download, size: 18),
-                    label: const Text('Download'),
-                  ),
-                if (modelInfo.canLoad)
-                  FilledButton.tonal(
-                    onPressed: onLoad,
-                    child: const Text('Load'),
-                  ),
-                if (modelInfo.isUsable)
-                  OutlinedButton(
-                    onPressed: onUnload,
-                    child: const Text('Unload'),
-                  ),
-                if (modelInfo.status == ModelStatus.downloading ||
-                    modelInfo.status == ModelStatus.loading)
-                  const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
+            LinearProgressIndicator(
+              value: modelInfo.downloadProgress / 100,
+              borderRadius: KoshikaRadius.sm,
+            ),
+            const SizedBox(height: KoshikaSpacing.xs),
+            Text(
+              '${modelInfo.downloadProgress}%',
+              style: theme.textTheme.labelSmall,
             ),
           ],
-        ),
+          if (modelInfo.errorMessage != null) ...[
+            const SizedBox(height: KoshikaSpacing.sm),
+            Text(
+              modelInfo.errorMessage!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.error,
+              ),
+            ),
+          ],
+          const SizedBox(height: KoshikaSpacing.md),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (modelInfo.canDownload)
+                FilledButton.icon(
+                  onPressed: onDownload,
+                  icon: const Icon(Icons.download, size: 18),
+                  label: const Text('Download'),
+                ),
+              if (modelInfo.canLoad)
+                FilledButton.tonal(
+                  onPressed: onLoad,
+                  child: const Text('Load'),
+                ),
+              if (modelInfo.isUsable)
+                OutlinedButton(
+                  onPressed: onUnload,
+                  child: const Text('Unload'),
+                ),
+              if (modelInfo.status == ModelStatus.downloading ||
+                  modelInfo.status == ModelStatus.loading)
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -747,61 +925,95 @@ class _EmbeddingModelTile extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// HuggingFace Token Dialog
+// Custom Model Dialog
 // ═══════════════════════════════════════════════════════════════════════
 
-class _HfTokenDialog extends StatefulWidget {
+class _CustomModelDialog extends StatefulWidget {
+  const _CustomModelDialog();
+
   @override
-  State<_HfTokenDialog> createState() => _HfTokenDialogState();
+  State<_CustomModelDialog> createState() => _CustomModelDialogState();
 }
 
-class _HfTokenDialogState extends State<_HfTokenDialog> {
-  final _controller = TextEditingController();
+class _CustomModelDialogState extends State<_CustomModelDialog> {
+  final _urlController = TextEditingController();
+  final _nameController = TextEditingController();
+  String? _urlError;
 
   @override
   void dispose() {
-    _controller.dispose();
+    _urlController.dispose();
+    _nameController.dispose();
     super.dispose();
+  }
+
+  void _submit() {
+    final url = _urlController.text.trim();
+    final name = _nameController.text.trim();
+
+    if (url.isEmpty) {
+      setState(() => _urlError = 'URL is required');
+      return;
+    }
+    if (!url.toLowerCase().endsWith('.gguf')) {
+      setState(() => _urlError = 'URL must point to a .gguf file');
+      return;
+    }
+
+    final displayName = name.isNotEmpty ? name : _filenameFromUrl(url);
+    Navigator.of(
+      context,
+    ).pop(LlmModelRegistry.custom(name: displayName, downloadUrl: url));
+  }
+
+  String _filenameFromUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      final filename = uri.pathSegments.last;
+      return filename.replaceAll('.gguf', '');
+    } catch (_) {
+      return 'Custom Model';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('HuggingFace Token'),
+      title: const Text('Custom GGUF Model'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Koshika downloads gated Hugging Face models, so you need a token '
-            'with access to both repos:',
+            'Paste the direct download URL for any GGUF model file. '
+            'You are responsible for model compatibility.',
             style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '1. Create a free account at huggingface.co\n'
-            '2. Request/accept access for:\n'
-            '   - litert-community/embeddinggemma-300m\n'
-            '   - litert-community/Gemma3-1B-IT\n'
-            '3. Create a Read token in Settings > Access Tokens\n'
-            '4. Paste that token here',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
           ),
           const SizedBox(height: 16),
           TextField(
-            controller: _controller,
+            controller: _urlController,
+            decoration: InputDecoration(
+              labelText: 'GGUF Download URL',
+              hintText: 'https://huggingface.co/.../model.gguf',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              errorText: _urlError,
+            ),
+            autocorrect: false,
+            keyboardType: TextInputType.url,
+            onChanged: (_) {
+              if (_urlError != null) setState(() => _urlError = null);
+            },
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nameController,
             decoration: const InputDecoration(
-              labelText: 'Access Token',
-              hintText: 'hf_...',
+              labelText: 'Display Name (optional)',
+              hintText: 'e.g. Phi-3 Mini',
               border: OutlineInputBorder(),
               isDense: true,
             ),
-            obscureText: true,
-            autocorrect: false,
           ),
         ],
       ),
@@ -810,15 +1022,7 @@ class _HfTokenDialogState extends State<_HfTokenDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: () {
-            final token = _controller.text.trim();
-            if (token.isNotEmpty) {
-              Navigator.of(context).pop(token);
-            }
-          },
-          child: const Text('Download'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('Use Model')),
       ],
     );
   }
