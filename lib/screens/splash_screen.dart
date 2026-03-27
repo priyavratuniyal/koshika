@@ -88,8 +88,8 @@ class _SplashScreenState extends State<SplashScreen>
             ModelStatus.ready) {
           // ignore: unawaited_futures
           app_main.embeddingService.loadModel().then((_) {
-            // Re-embed any results that have stale or missing embeddings
-            _migrateEmbeddingsIfNeeded();
+            // Re-embed any results that have stale or missing embeddings.
+            app_main.migrateEmbeddingsIfNeeded();
           });
         }
       }
@@ -117,35 +117,6 @@ class _SplashScreenState extends State<SplashScreen>
               'Something went wrong during startup. Please restart the app.';
         });
       }
-    }
-  }
-
-  /// One-time migration: recompute all embeddings when the embedding
-  /// dimension changes (768 → 384 after flutter_gemma → llama_cpp_dart).
-  Future<void> _migrateEmbeddingsIfNeeded() async {
-    if (!app_main.kAiEnabled) return;
-    if (!app_main.embeddingService.isLoaded) return;
-
-    try {
-      final allResults = app_main.objectbox.biomarkerResultBox.getAll();
-      if (allResults.isEmpty) return;
-
-      // Check if any result has stale (768-dim) or missing embeddings
-      final needsMigration = allResults.any(
-        (r) =>
-            r.embedding == null ||
-            r.embedding!.isEmpty ||
-            r.embedding!.length != 384,
-      );
-
-      if (needsMigration) {
-        debugPrint(
-          'SplashScreen: migrating ${allResults.length} embeddings to 384-dim',
-        );
-        await app_main.vectorStoreService.rebuildIndex(allResults);
-      }
-    } catch (e) {
-      debugPrint('Embedding migration failed (non-fatal): $e');
     }
   }
 

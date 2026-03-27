@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 
@@ -76,6 +77,8 @@ class ModelDownloader {
 
     _client = HttpClient();
 
+    IOSink? sink;
+
     try {
       var startByte = 0;
       if (tempFile.existsSync()) {
@@ -89,11 +92,33 @@ class ModelDownloader {
 
       final response = await request.close();
 
+      final statusCode = response.statusCode;
+      final isSuccessful =
+          statusCode == HttpStatus.partialContent ||
+          (statusCode >= HttpStatus.ok &&
+              statusCode < HttpStatus.multipleChoices);
+      if (!isSuccessful) {
+        final errorBody = await response.transform(utf8.decoder).join();
+        final reasonPhrase = response.reasonPhrase.trim();
+        final message = StringBuffer()
+          ..write(
+            'Failed to download model: HTTP $statusCode '
+                    '$reasonPhrase'
+                .trim(),
+          );
+        if (errorBody.trim().isNotEmpty) {
+          message.write(' - ${errorBody.trim()}');
+        }
+        throw HttpException(message.toString(), uri: Uri.parse(url));
+      }
+
       // Determine total size
       int total;
       if (response.statusCode == HttpStatus.partialContent) {
         // Server accepted the Range request
-        total = startByte + response.contentLength;
+        total = response.contentLength > 0
+            ? startByte + response.contentLength
+            : -1;
       } else if (response.contentLength > 0) {
         // Full response — restart from scratch
         startByte = 0;
@@ -102,7 +127,7 @@ class ModelDownloader {
         total = -1; // Unknown size
       }
 
-      final sink = tempFile.openWrite(
+      sink = tempFile.openWrite(
         mode: startByte > 0 && response.statusCode == HttpStatus.partialContent
             ? FileMode.append
             : FileMode.write,
@@ -112,7 +137,6 @@ class ModelDownloader {
 
       await for (final chunk in response) {
         if (_cancelled) {
-          await sink.close();
           throw const DownloadCancelledException();
         }
         sink.add(chunk);
@@ -122,6 +146,7 @@ class ModelDownloader {
 
       await sink.flush();
       await sink.close();
+      sink = null;
 
       // Move temp file to final path
       if (File(filePath).existsSync()) {
@@ -130,7 +155,16 @@ class ModelDownloader {
       await tempFile.rename(filePath);
 
       return filePath;
+    } on Object {
+      if (_cancelled) {
+        throw const DownloadCancelledException();
+      }
+      rethrow;
     } finally {
+      if (sink != null) {
+        await sink.flush();
+        await sink.close();
+      }
       _client?.close();
       _client = null;
     }

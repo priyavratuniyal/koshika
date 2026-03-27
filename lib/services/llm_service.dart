@@ -32,6 +32,8 @@ class LlmService {
   LlamaEngine? _engine;
   ModelDownloader? _downloader;
   bool _isGenerating = false;
+  Future<void>? _downloadTask;
+  int _downloadOperationId = 0;
 
   final _statusController = StreamController<ModelInfo>.broadcast();
 
@@ -72,7 +74,11 @@ class LlmService {
           final name = prefs.getString(_customNameKey);
           final url = prefs.getString(_customUrlKey);
           if (name != null && url != null) {
-            restored = LlmModelRegistry.custom(name: name, downloadUrl: url);
+            try {
+              restored = LlmModelRegistry.custom(name: name, downloadUrl: url);
+            } catch (e) {
+              debugPrint('LlmService.initialize: invalid custom model URL: $e');
+            }
           }
         } else {
           restored = LlmModelRegistry.findById(savedId);
@@ -101,7 +107,9 @@ class LlmService {
 
   /// Switch to a different model. Unloads + deletes the current file first.
   Future<void> switchModel(LlmModelConfig newConfig) async {
-    if (newConfig.id == _config.id && !newConfig.isCustom) return;
+    if (_sameConfig(_config, newConfig)) return;
+
+    await _cancelActiveDownloadIfNeeded();
 
     // Tear down current model
     await unloadModel();
@@ -112,12 +120,7 @@ class LlmService {
     _config = newConfig;
 
     // Persist selection
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_selectedModelKey, newConfig.id);
-    if (newConfig.isCustom) {
-      await prefs.setString(_customNameKey, newConfig.name);
-      await prefs.setString(_customUrlKey, newConfig.downloadUrl);
-    }
+    await _persistSelection(newConfig);
 
     _updateStatus(
       ModelInfo(
@@ -149,13 +152,31 @@ class LlmService {
       ),
     );
 
-    _downloader = ModelDownloader();
+    final downloadOperationId = ++_downloadOperationId;
+    final downloader = ModelDownloader();
+    final config = _config;
 
+    _downloader = downloader;
+    final task = _runDownload(
+      downloader: downloader,
+      config: config,
+      downloadOperationId: downloadOperationId,
+    );
+    _downloadTask = task;
+    await task;
+  }
+
+  Future<void> _runDownload({
+    required ModelDownloader downloader,
+    required LlmModelConfig config,
+    required int downloadOperationId,
+  }) async {
     try {
-      await _downloader!.download(
-        _config.downloadUrl,
-        _config.filename,
+      await downloader.download(
+        config.downloadUrl,
+        config.filename,
         onProgress: (received, total) {
+          if (!_isActiveDownload(downloadOperationId, downloader)) return;
           final pct = total > 0 ? (received * 100 ~/ total) : 0;
           _updateStatus(
             _modelInfo.copyWith(
@@ -166,12 +187,12 @@ class LlmService {
         },
       );
 
-      _downloader = null;
+      if (!_isActiveDownload(downloadOperationId, downloader)) return;
       _updateStatus(
         _modelInfo.copyWith(status: ModelStatus.ready, downloadProgress: 100),
       );
     } catch (e) {
-      _downloader = null;
+      if (!_isActiveDownload(downloadOperationId, downloader)) return;
 
       if (e is DownloadCancelledException) {
         _updateStatus(
@@ -189,10 +210,17 @@ class LlmService {
           downloadProgress: 0,
           errorMessage: ErrorClassifier.download(
             e,
-            estimatedSizeMB: _config.estimatedSizeMB,
+            estimatedSizeMB: config.estimatedSizeMB,
           ),
         ),
       );
+    } finally {
+      if (_downloadOperationId == downloadOperationId) {
+        _downloadTask = null;
+      }
+      if (identical(_downloader, downloader)) {
+        _downloader = null;
+      }
     }
   }
 
@@ -222,8 +250,7 @@ class LlmService {
       await _engine!.loadModel(path);
       _updateStatus(_modelInfo.copyWith(status: ModelStatus.loaded));
     } catch (e) {
-      await _engine?.dispose();
-      _engine = null;
+      await _disposeEngine();
       _updateStatus(
         _modelInfo.copyWith(
           status: ModelStatus.error,
@@ -287,9 +314,7 @@ class LlmService {
   /// Unload the model from memory. Files stay on disk.
   Future<void> unloadModel() async {
     if (_isGenerating) await stopGeneration();
-    if (_engine != null) {
-      await _engine!.unloadModel();
-    }
+    await _disposeEngine(unloadFirst: true);
 
     if (_modelInfo.status == ModelStatus.loaded ||
         _modelInfo.status == ModelStatus.loading) {
@@ -336,10 +361,62 @@ class LlmService {
     if (!_statusController.isClosed) _statusController.add(info);
   }
 
+  Future<void> _persistSelection(LlmModelConfig config) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_selectedModelKey, config.id);
+    if (config.isCustom) {
+      await prefs.setString(_customNameKey, config.name);
+      await prefs.setString(_customUrlKey, config.downloadUrl);
+    }
+  }
+
+  Future<void> _cancelActiveDownloadIfNeeded() async {
+    final task = _downloadTask;
+    if (task == null) return;
+
+    _downloadOperationId++;
+    _downloader?.cancel();
+
+    try {
+      await task;
+    } catch (_) {
+      // Switching models supersedes the previous download result.
+    } finally {
+      _downloader = null;
+      _downloadTask = null;
+    }
+  }
+
+  bool _isActiveDownload(int downloadOperationId, ModelDownloader downloader) {
+    return _downloadOperationId == downloadOperationId &&
+        identical(_downloader, downloader);
+  }
+
+  bool _sameConfig(LlmModelConfig left, LlmModelConfig right) {
+    return left.id == right.id &&
+        left.name == right.name &&
+        left.downloadUrl == right.downloadUrl &&
+        left.isCustom == right.isCustom;
+  }
+
+  Future<void> _disposeEngine({bool unloadFirst = false}) async {
+    final engine = _engine;
+    _engine = null;
+    if (engine == null) return;
+
+    try {
+      if (unloadFirst && engine.isReady) {
+        await engine.unloadModel();
+      }
+    } finally {
+      await engine.dispose();
+    }
+  }
+
   /// Release all resources.
   Future<void> dispose() async {
-    await _engine?.dispose();
-    _engine = null;
+    await _cancelActiveDownloadIfNeeded();
+    await _disposeEngine();
     _statusController.close();
   }
 }

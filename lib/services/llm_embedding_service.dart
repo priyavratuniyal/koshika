@@ -149,8 +149,7 @@ class LlmEmbeddingService {
       await _engine!.loadModel(path);
       _updateStatus(_modelInfo.copyWith(status: ModelStatus.loaded));
     } catch (e) {
-      await _engine?.dispose();
-      _engine = null;
+      await _disposeEngine();
       _updateStatus(
         _modelInfo.copyWith(
           status: ModelStatus.error,
@@ -185,9 +184,7 @@ class LlmEmbeddingService {
   // ═══════════════════════════════════════════════════════════════════════
 
   Future<void> unloadModel() async {
-    if (_engine != null) {
-      await _engine!.unloadModel();
-    }
+    await _disposeEngine(unloadFirst: true);
     if (_modelInfo.status == ModelStatus.loaded ||
         _modelInfo.status == ModelStatus.loading) {
       _updateStatus(_modelInfo.copyWith(status: ModelStatus.ready));
@@ -203,9 +200,22 @@ class LlmEmbeddingService {
     if (!_statusController.isClosed) _statusController.add(info);
   }
 
-  Future<void> dispose() async {
-    await _engine?.dispose();
+  Future<void> _disposeEngine({bool unloadFirst = false}) async {
+    final engine = _engine;
     _engine = null;
+    if (engine == null) return;
+
+    try {
+      if (unloadFirst && engine.isReady) {
+        await engine.unloadModel();
+      }
+    } finally {
+      await engine.dispose();
+    }
+  }
+
+  Future<void> dispose() async {
+    await _disposeEngine();
     _statusController.close();
   }
 }

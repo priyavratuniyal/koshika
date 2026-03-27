@@ -22,6 +22,7 @@ late BiomarkerDictionary biomarkerDictionary;
 late LlmService llmService;
 late LlmEmbeddingService embeddingService;
 late VectorStoreService vectorStoreService;
+Future<void>? _embeddingMigrationTask;
 
 /// Whether AI features are enabled. Set by the entry point
 /// (main_full.dart vs main_lite.dart).
@@ -36,6 +37,38 @@ Future<void> appMain({required bool aiEnabled}) async {
   WidgetsFlutterBinding.ensureInitialized();
   kAiEnabled = aiEnabled;
   runApp(const KoshikaApp());
+}
+
+Future<void> migrateEmbeddingsIfNeeded() {
+  if (!kAiEnabled || !embeddingService.isLoaded) {
+    return Future.value();
+  }
+
+  return _embeddingMigrationTask ??= _runEmbeddingMigration().whenComplete(() {
+    _embeddingMigrationTask = null;
+  });
+}
+
+Future<void> _runEmbeddingMigration() async {
+  try {
+    final allResults = objectbox.biomarkerResultBox.getAll();
+    if (allResults.isEmpty) return;
+
+    final needsMigration = allResults.any(
+      (result) =>
+          result.embedding == null ||
+          result.embedding!.isEmpty ||
+          result.embedding!.length != 384,
+    );
+    if (!needsMigration) return;
+
+    debugPrint(
+      'KoshikaApp: migrating ${allResults.length} embeddings to 384-dim',
+    );
+    await vectorStoreService.rebuildIndex(allResults);
+  } catch (e) {
+    debugPrint('Embedding migration failed (non-fatal): $e');
+  }
 }
 
 class KoshikaApp extends StatelessWidget {

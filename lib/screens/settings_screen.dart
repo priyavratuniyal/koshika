@@ -117,6 +117,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (result != null) await _onModelSelected(result);
   }
 
+  Future<void> _loadEmbeddingModel() async {
+    await embeddingService.loadModel();
+    await migrateEmbeddingsIfNeeded();
+  }
+
   // ─── Data Actions ───────────────────────────────────────────────────
 
   Future<void> _deleteAllData() async {
@@ -252,7 +257,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _EmbeddingModelTile(
               modelInfo: _embeddingInfo,
               onDownload: () => embeddingService.downloadModel(),
-              onLoad: () => embeddingService.loadModel(),
+              onLoad: _loadEmbeddingModel,
               onUnload: () => embeddingService.unloadModel(),
             ),
             const SizedBox(height: KoshikaSpacing.sm),
@@ -955,24 +960,14 @@ class _CustomModelDialogState extends State<_CustomModelDialog> {
       setState(() => _urlError = 'URL is required');
       return;
     }
-    if (!url.toLowerCase().endsWith('.gguf')) {
-      setState(() => _urlError = 'URL must point to a .gguf file');
-      return;
-    }
-
-    final displayName = name.isNotEmpty ? name : _filenameFromUrl(url);
-    Navigator.of(
-      context,
-    ).pop(LlmModelRegistry.custom(name: displayName, downloadUrl: url));
-  }
-
-  String _filenameFromUrl(String url) {
     try {
-      final uri = Uri.parse(url);
-      final filename = uri.pathSegments.last;
-      return filename.replaceAll('.gguf', '');
-    } catch (_) {
-      return 'Custom Model';
+      final parsed = LlmModelRegistry.inspectCustomDownloadUrl(url);
+      final displayName = name.isNotEmpty ? name : parsed.suggestedName;
+      Navigator.of(
+        context,
+      ).pop(LlmModelRegistry.custom(name: displayName, downloadUrl: url));
+    } on ArgumentError catch (e) {
+      setState(() => _urlError = e.message?.toString() ?? 'Invalid GGUF URL');
     }
   }
 

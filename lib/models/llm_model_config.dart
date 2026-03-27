@@ -1,3 +1,59 @@
+class CustomModelUrlDetails {
+  final String normalizedUrl;
+  final String filename;
+
+  const CustomModelUrlDetails({
+    required this.normalizedUrl,
+    required this.filename,
+  });
+
+  String get suggestedName =>
+      filename.replaceFirst(RegExp(r'\.gguf$', caseSensitive: false), '');
+}
+
+String? _extractGgufFilename(Uri uri) {
+  if (uri.pathSegments.isNotEmpty) {
+    final candidate = uri.pathSegments.last;
+    if (candidate.isNotEmpty && candidate.toLowerCase().endsWith('.gguf')) {
+      return candidate;
+    }
+  }
+
+  for (final values in uri.queryParametersAll.values) {
+    for (final value in values) {
+      final candidate = _extractGgufFilenameFromValue(value);
+      if (candidate != null) return candidate;
+    }
+  }
+
+  return null;
+}
+
+String? _extractGgufFilenameFromValue(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return null;
+
+  final uri = Uri.tryParse(trimmed);
+  final candidate = uri != null && uri.pathSegments.isNotEmpty
+      ? uri.pathSegments.last
+      : trimmed.split('/').last;
+
+  if (candidate.isEmpty || !candidate.toLowerCase().endsWith('.gguf')) {
+    return null;
+  }
+
+  return candidate;
+}
+
+String _filenameFromDownloadUrl(
+  String downloadUrl, {
+  required String fallbackId,
+}) {
+  final uri = Uri.tryParse(downloadUrl);
+  if (uri == null) return '$fallbackId.gguf';
+  return _extractGgufFilename(uri) ?? '$fallbackId.gguf';
+}
+
 /// Configuration for a downloadable GGUF model (curated or custom).
 class LlmModelConfig {
   final String id;
@@ -18,8 +74,7 @@ class LlmModelConfig {
 
   /// Derive the on-disk filename from the download URL.
   String get filename {
-    final uri = Uri.parse(downloadUrl);
-    return uri.pathSegments.isNotEmpty ? uri.pathSegments.last : '$id.gguf';
+    return _filenameFromDownloadUrl(downloadUrl, fallbackId: id);
   }
 
   /// Human-readable size string.
@@ -86,13 +141,40 @@ abstract final class LlmModelRegistry {
     required String name,
     required String downloadUrl,
   }) {
+    final parsed = inspectCustomDownloadUrl(downloadUrl);
+    final displayName = name.trim().isNotEmpty
+        ? name.trim()
+        : parsed.suggestedName;
+
     return LlmModelConfig(
       id: 'custom',
-      name: name,
-      downloadUrl: downloadUrl,
+      name: displayName,
+      downloadUrl: parsed.normalizedUrl,
       estimatedSizeMB: 0,
       description: 'Custom GGUF model',
       isCustom: true,
+    );
+  }
+
+  static CustomModelUrlDetails inspectCustomDownloadUrl(String rawUrl) {
+    final normalizedUrl = rawUrl.trim();
+    if (normalizedUrl.isEmpty) {
+      throw ArgumentError('URL is required');
+    }
+
+    final uri = Uri.tryParse(normalizedUrl);
+    if (uri == null || uri.scheme != 'https' || !uri.hasAuthority) {
+      throw ArgumentError('URL must be a valid HTTPS link');
+    }
+
+    final filename = _extractGgufFilename(uri);
+    if (filename == null) {
+      throw ArgumentError('URL must point to a .gguf file');
+    }
+
+    return CustomModelUrlDetails(
+      normalizedUrl: normalizedUrl,
+      filename: filename,
     );
   }
 
