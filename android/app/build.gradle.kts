@@ -20,10 +20,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "dev.koshika.koshika"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -32,8 +29,6 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
@@ -41,12 +36,30 @@ android {
         }
     }
 
-    packaging {
-        jniLibs {
-            excludes += "**/libVkLayer_khronos_validation.so"
-            excludes += "**/libmediapipe_tasks_vision_image_generator_jni.so"
-            excludes += "**/libimagegenerator_gpu.so"
+    flavorDimensions += "appType"
+    productFlavors {
+        create("lite") {
+            dimension = "appType"
+            applicationIdSuffix = ".lite"
+            versionNameSuffix = "-lite"
         }
+        create("full") {
+            dimension = "appType"
+        }
+    }
+}
+
+// Strip llama.cpp native libs from the lite flavor APK.
+// This runs after packaging to remove AI inference libraries,
+// keeping the lite APK small (~15MB smaller).
+androidComponents {
+    onVariants(selector().withFlavor("appType" to "lite")) { variant ->
+        variant.packaging.jniLibs.excludes.addAll(listOf(
+            "**/libllama.so",
+            "**/libggml*.so",
+            "**/libmtmd.so",
+            "**/libllamadart.so",
+        ))
     }
 }
 
