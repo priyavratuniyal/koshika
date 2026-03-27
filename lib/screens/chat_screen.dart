@@ -3,13 +3,11 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import 'package:flutter_gemma/flutter_gemma.dart';
-
 import '../main.dart';
 import '../models/models.dart';
+import '../models/retrieval_result.dart';
 import '../services/chat_context_builder.dart';
 import '../services/citation_extractor.dart';
-import '../services/embedding_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/koshika_design_system.dart';
 import '../widgets/chat_message_bubble.dart';
@@ -44,13 +42,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   StreamSubscription<ModelInfo>? _statusSubscription;
   StreamSubscription<String>? _generationSubscription;
-  ModelInfo _modelInfo = gemmaService.currentModelInfo;
+  ModelInfo _modelInfo = llmService.currentModelInfo;
 
   @override
   void initState() {
     super.initState();
     _contextBuilder = ChatContextBuilder(vectorStore: vectorStoreService);
-    _statusSubscription = gemmaService.modelStatusStream.listen((info) {
+    _statusSubscription = llmService.modelStatusStream.listen((info) {
       if (mounted) {
         setState(() => _modelInfo = info);
       }
@@ -216,7 +214,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadSession(ChatSession session) async {
     _generationSubscription?.cancel();
     _generationSubscription = null;
-    await gemmaService.stopGeneration();
+    await llmService.stopGeneration();
 
     List<PersistedChatMessage> persisted;
     try {
@@ -252,7 +250,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendMessage([String? overrideText]) async {
     final text = (overrideText ?? _textController.text).trim();
     if (text.isEmpty || !mounted) return;
-    if (gemmaService.isGenerating) return;
+    if (llmService.isGenerating) return;
 
     _textController.clear();
     final activeSession = _ensureCurrentSession(text);
@@ -295,7 +293,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     _generationSubscription?.cancel();
-    _generationSubscription = gemmaService
+    _generationSubscription = llmService
         .generateResponse(text, context: context)
         .listen(
           (token) {
@@ -348,7 +346,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _stopGeneration() async {
     _generationSubscription?.cancel();
     _generationSubscription = null;
-    await gemmaService.stopGeneration();
+    await llmService.stopGeneration();
 
     // Finalize the last message
     if (mounted && _messages.isNotEmpty && _messages.last.isStreaming) {
@@ -371,7 +369,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _startNewChat() {
     _generationSubscription?.cancel();
     _generationSubscription = null;
-    gemmaService.stopGeneration();
+    llmService.stopGeneration();
     setState(() {
       _currentSession = null;
       _messages.clear();
@@ -393,91 +391,27 @@ class _ChatScreenState extends State<ChatScreen> {
   // ─── Model Actions ─────────────────────────────────────────────────
 
   Future<void> _downloadModel() async {
-    final token = await _getOrPromptHfToken();
-    if (token == null || token.isEmpty) return;
-    await gemmaService.downloadModel(hfToken: token);
+    await llmService.downloadModel();
   }
 
   void _cancelDownload() {
-    gemmaService.cancelDownload();
+    llmService.cancelDownload();
   }
 
   Future<void> _loadModel() async {
-    await gemmaService.loadModel();
+    await llmService.loadModel();
   }
 
   Future<void> _unloadModel() async {
-    await gemmaService.unloadModel();
+    await llmService.unloadModel();
   }
 
   Future<void> _retryFromError() async {
-    // Determine what to retry based on current state history
     if (_modelInfo.canDownload) {
       await _downloadModel();
     } else if (_modelInfo.canLoad) {
       await _loadModel();
     }
-  }
-
-  Future<String?> _getOrPromptHfToken() async {
-    var token = await EmbeddingService.getHfToken();
-    if (token != null && token.isNotEmpty) return token;
-    if (!mounted) return null;
-
-    final controller = TextEditingController();
-    token = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hugging Face Token'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'The chat model is gated on Hugging Face and needs a token with '
-              'read access.',
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Grant access to litert-community/Gemma3-1B-IT, create a Read '
-              'token, then paste it here.',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Access Token',
-                hintText: 'hf_...',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              obscureText: true,
-              autocorrect: false,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              if (value.isNotEmpty) {
-                Navigator.of(context).pop(value);
-              }
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-
-    if (token == null || token.isEmpty) return null;
-    await EmbeddingService.saveHfToken(token);
-    return token;
   }
 
   // ─── Build ─────────────────────────────────────────────────────────
@@ -489,7 +423,7 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Text(_currentSession?.title ?? 'AI Chat'),
         actions: [
           IconButton(
-            onPressed: gemmaService.isGenerating ? null : _openSessionSheet,
+            onPressed: llmService.isGenerating ? null : _openSessionSheet,
             tooltip: 'Conversations',
             icon: const Icon(Icons.history),
           ),
@@ -554,7 +488,7 @@ class _ChatScreenState extends State<ChatScreen> {
           messages: _messages,
           textController: _textController,
           scrollController: _scrollController,
-          isGenerating: gemmaService.isGenerating,
+          isGenerating: llmService.isGenerating,
           isSemanticSearchActive: _contextBuilder.isSemanticSearchActive,
           onSend: _sendMessage,
           onStop: _stopGeneration,

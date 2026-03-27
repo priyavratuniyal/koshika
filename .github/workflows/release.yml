@@ -34,8 +34,10 @@ jobs:
       - name: Generate ObjectBox bindings
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build release APK
-        run: flutter build apk --release --split-per-abi --target-platform android-arm64,android-x64
+      - name: Build release APKs
+        run: |
+          flutter build apk --flavor lite -t lib/main_lite.dart --release --split-per-abi --target-platform android-arm64,android-x64
+          flutter build apk --flavor full -t lib/main_full.dart --release --split-per-abi --target-platform android-arm64,android-x64
 
       - name: Rename APKs with version
         run: |

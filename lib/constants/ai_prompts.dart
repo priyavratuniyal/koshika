@@ -3,12 +3,11 @@
 /// Keeping prompts here (rather than inlined in service files) makes them
 /// easy to review, iterate, and A/B test without touching service logic.
 abstract final class AiPrompts {
-  /// System prompt for the Gemma chat model.
+  /// System prompt injected before every user query.
   ///
-  /// Injected as a [Message.systemInfo] turn before every user query.
   /// Lab data context is added separately to the user turn so that
   /// small (1B-param) models cannot ignore it.
-  static const String gemmaSystemPrompt = '''
+  static const String systemPrompt = '''
 You are Koshika AI, a helpful on-device health assistant built into the Koshika app. You help users understand their lab report results.
 
 CRITICAL RULES:
