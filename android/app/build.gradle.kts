@@ -36,6 +36,14 @@ android {
         }
     }
 
+    packaging {
+        jniLibs {
+            excludes += "**/libVkLayer_khronos_validation.so"
+            excludes += "**/libmediapipe_tasks_vision_image_generator_jni.so"
+            excludes += "**/libimagegenerator_gpu.so"
+        }
+    }
+
     flavorDimensions += "appType"
     productFlavors {
         create("lite") {
