@@ -94,7 +94,9 @@
         {
           "id": "16:557227151494494808",
           "name": "embedding",
-          "type": 28
+          "indexId": "6:3191674845316224774",
+          "type": 28,
+          "flags": 8
         }
       ],
       "relations": []
@@ -268,7 +270,7 @@
     }
   ],
   "lastEntityId": "5:1397208082251365964",
-  "lastIndexId": "5:2477129363995053950",
+  "lastIndexId": "6:3191674845316224774",
   "lastRelationId": "0:0",
   "lastSequenceId": "0:0",
   "modelVersion": 5,

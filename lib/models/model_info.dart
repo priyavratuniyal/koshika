@@ -26,7 +26,7 @@ class ModelInfo {
   final int estimatedSizeMB;
   final ModelStatus status;
 
-  /// Download progress as an integer 0–100 (from flutter_gemma callback).
+  /// Download progress as an integer 0–100.
   final int downloadProgress;
   final String? errorMessage;
 
