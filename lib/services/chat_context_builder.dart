@@ -1,5 +1,6 @@
-import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:intl/intl.dart';
+
+import '../models/retrieval_result.dart';
 
 import '../main.dart';
 import '../models/models.dart';

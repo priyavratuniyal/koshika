@@ -1,7 +1,8 @@
 import 'dart:convert';
 
-import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:intl/intl.dart';
+
+import '../models/retrieval_result.dart';
 
 /// Extracts [N] citation references from an LLM response and builds a source footer.
 ///
