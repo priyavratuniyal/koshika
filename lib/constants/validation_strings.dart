@@ -28,6 +28,11 @@ abstract final class ValidationStrings {
       'I can help explain your lab values, but I cannot provide diagnoses. '
       'Please consult a healthcare professional for medical advice.';
 
+  /// Shown when the model output appears garbled or incoherent.
+  static const String garbledFallback =
+      "I wasn't able to generate a clear response. "
+      'Please try asking your question again.';
+
   // ─── Truncation ─────────────────────────────────────────────────────
 
   /// Appended when a response exceeds the maximum length and is truncated.

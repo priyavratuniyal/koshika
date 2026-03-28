@@ -22,6 +22,10 @@ enum ValidationResult {
 
   /// Output exceeds [TokenBudgets.maxResponseChars] — needs truncation.
   tooLong,
+
+  /// Output appears garbled or incoherent (high non-ASCII ratio, abnormal
+  /// word lengths, or excessive non-dictionary character sequences).
+  garbled,
 }
 
 /// Post-generation quality gate for LLM output.
@@ -56,12 +60,17 @@ abstract final class OutputValidator {
       return ValidationResult.repetitive;
     }
 
-    // 4. Prohibited content check
+    // 4. Garbled output check
+    if (_isGarbled(output)) {
+      return ValidationResult.garbled;
+    }
+
+    // 5. Prohibited content check
     if (_hasProhibitedContent(output)) {
       return ValidationResult.prohibited;
     }
 
-    // 5. Excessive length check
+    // 6. Excessive length check
     if (output.length > TokenBudgets.maxResponseChars) {
       return ValidationResult.tooLong;
     }
@@ -98,6 +107,12 @@ abstract final class OutputValidator {
           'prohibited diagnostic language detected',
         );
         return ValidationStrings.prohibitedContentFallback;
+      case ValidationResult.garbled:
+        debugPrint(
+          '${ValidationStrings.validationFailedPrefix}'
+          'garbled or incoherent output detected',
+        );
+        return ValidationStrings.garbledFallback;
       case ValidationResult.tooLong:
         return _truncateAtSentence(originalOutput);
     }
@@ -158,15 +173,17 @@ abstract final class OutputValidator {
   /// Check if > [TokenBudgets.repetitionThreshold] of the output consists
   /// of repeated phrases (common small-model failure mode).
   static bool _isRepetitive(String output) {
-    if (output.length < 100) return false;
+    if (output.length < TokenBudgets.minLengthForRepetitionCheck) return false;
 
     // Split into sentences and check for duplicates
     final sentences = output
         .split(RegExp(r'[.!?]\s+'))
-        .where((s) => s.trim().length > 10)
+        .where((s) => s.trim().length > TokenBudgets.minSentenceLengthChars)
         .toList();
 
-    if (sentences.length < 3) return false;
+    if (sentences.length < TokenBudgets.minSentenceCountForRepetition) {
+      return false;
+    }
 
     final unique = sentences.toSet();
     final duplicateRatio = 1.0 - (unique.length / sentences.length);
@@ -175,7 +192,7 @@ abstract final class OutputValidator {
 
     // Also check for repeated n-grams (3-word sequences)
     final words = output.toLowerCase().split(RegExp(r'\s+'));
-    if (words.length < 12) return false;
+    if (words.length < TokenBudgets.minWordsForTrigramCheck) return false;
 
     final trigrams = <String>{};
     int repeatedCount = 0;
@@ -188,6 +205,39 @@ abstract final class OutputValidator {
 
     final trigramRatio = repeatedCount / (words.length - 2);
     return trigramRatio >= TokenBudgets.repetitionThreshold;
+  }
+
+  // ─── Garbled Output Detection ──────────────────────────────────────
+
+  /// Detect garbled or incoherent output using three heuristics:
+  /// 1. High non-ASCII character ratio (encoding artifacts, mojibake)
+  /// 2. Abnormally long average word length (token soup)
+  /// 3. Low vowel-word ratio (consonant-only gibberish)
+  static bool _isGarbled(String output) {
+    if (output.length < TokenBudgets.minLengthForGarbledCheck) return false;
+
+    // Heuristic 1: Non-ASCII ratio
+    final nonAscii = output.runes.where((r) => r > 127).length;
+    final nonAsciiRatio = nonAscii / output.length;
+    if (nonAsciiRatio > TokenBudgets.garbledNonAsciiThreshold) return true;
+
+    // Heuristic 2: Average word length
+    final words = output
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+    if (words.isEmpty) return false;
+    final totalChars = words.fold<int>(0, (sum, w) => sum + w.length);
+    final avgWordLength = totalChars / words.length;
+    if (avgWordLength > TokenBudgets.garbledAvgWordLengthThreshold) return true;
+
+    // Heuristic 3: Vowel-word ratio — real words contain vowels
+    final vowelPattern = RegExp(r'[aeiouAEIOU]');
+    final wordsWithVowels = words.where((w) => vowelPattern.hasMatch(w)).length;
+    final vowelRatio = wordsWithVowels / words.length;
+    if (vowelRatio < TokenBudgets.garbledVowelWordThreshold) return true;
+
+    return false;
   }
 
   // ─── Prohibited Content ────────────────────────────────────────────
