@@ -6,8 +6,11 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../models/retrieval_result.dart';
+import '../constants/ai_prompts.dart';
+import '../models/query_decision.dart';
 import '../services/chat_context_builder.dart';
 import '../services/citation_extractor.dart';
+import '../services/query_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/koshika_design_system.dart';
 import '../widgets/chat_message_bubble.dart';
@@ -36,6 +39,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   late final ChatContextBuilder _contextBuilder;
+  final QueryRouter _queryRouter = QueryRouter();
   ChatSession? _currentSession;
   bool _hasShownPersistenceWarning = false;
   bool _hasLoggedUnknownRoleIndex = false;
@@ -247,6 +251,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ─── Chat Logic ────────────────────────────────────────────────────
 
+  /// Display a pre-built response without invoking the LLM.
+  void _addDeterministicResponse(String content, {ChatSession? session}) {
+    final msg = ChatMessage(content: content, role: ChatRole.assistant);
+    setState(() => _messages.add(msg));
+    if (session != null) _persistMessage(session, msg);
+    _scrollToBottom();
+  }
+
   Future<void> _sendMessage([String? overrideText]) async {
     final text = (overrideText ?? _textController.text).trim();
     if (text.isEmpty || !mounted) return;
@@ -265,11 +277,47 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _scrollToBottom();
 
-    // Build context from lab data (async — may use semantic search)
-    final context = await _contextBuilder.buildQueryContext(text);
-    final retrievedDocs = List<RetrievalResult>.from(
-      _contextBuilder.lastRetrievedDocs,
-    );
+    // Route the query — may short-circuit with a deterministic response
+    late final QueryRouteResult routeResult;
+    try {
+      final hasLabData = objectbox.getLatestResults().isNotEmpty;
+      routeResult = _queryRouter.route(text, hasLabData: hasLabData);
+    } catch (e) {
+      // If routing fails (e.g. ObjectBox error), fall through to LLM
+      debugPrint('Query routing failed, falling through to LLM: $e');
+      routeResult = const QueryRouteResult(
+        decision: QueryDecision.answerGeneralHealth,
+      );
+    }
+
+    if (!routeResult.requiresLlm) {
+      if (mounted) {
+        _addDeterministicResponse(
+          routeResult.deterministicResponse!,
+          session: activeSession,
+        );
+      }
+      return;
+    }
+
+    // Select system prompt and context strategy based on routing decision
+    final isGeneralHealth =
+        routeResult.decision == QueryDecision.answerGeneralHealth;
+    final promptOverride = isGeneralHealth
+        ? AiPrompts.generalHealthPrompt
+        : null;
+
+    // Only build lab context for queries that need it — skip semantic search
+    // for general health education to avoid contradictory prompt/context
+    // signals and save computation.
+    String? context;
+    var retrievedDocs = <RetrievalResult>[];
+    if (!isGeneralHealth) {
+      context = await _contextBuilder.buildQueryContext(text);
+      retrievedDocs = List<RetrievalResult>.from(
+        _contextBuilder.lastRetrievedDocs,
+      );
+    }
 
     if (!mounted) return;
 
@@ -294,7 +342,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _generationSubscription?.cancel();
     _generationSubscription = llmService
-        .generateResponse(text, context: context)
+        .generateResponse(
+          text,
+          context: context,
+          systemPromptOverride: promptOverride,
+        )
         .listen(
           (token) {
             tokenBuffer.write(token);
