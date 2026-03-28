@@ -48,9 +48,21 @@ abstract final class LlmStrings {
   /// Prefix for the user's actual question when lab context is present.
   static const String questionPrefix = 'Question: ';
 
+  // ─── Conversation History Labels ─────────────────────────────────────
+
+  /// ChatML role tag for prior user turns injected as history.
+  static const String historyUserRole = 'user';
+
+  /// ChatML role tag for prior assistant turns injected as history.
+  static const String historyAssistantRole = 'assistant';
+
   // ─── Chat Screen Copy ────────────────────────────────────────────────
 
   /// Snackbar shown when chat message persistence fails.
   static const String persistenceWarning =
       'Could not save chat history for one or more messages.';
+
+  /// Debug log when query routing fails.
+  static const String routingFailedLog =
+      'Query routing failed, falling through to LLM: ';
 }

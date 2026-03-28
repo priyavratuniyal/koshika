@@ -9,7 +9,7 @@ abstract final class IntentPrefilter {
 
   static final _emergencyPatterns = [
     // Cardiac — match both word orders ("chest pain" and "pain in chest")
-    RegExp(r'chest\s*pain', caseSensitive: false),
+    RegExp(r'chest\s*(pain|pressure|tightness)', caseSensitive: false),
     RegExp(r'pain\s*(in|on)\s*(my\s*)?chest', caseSensitive: false),
     RegExp(r'heart\s*attack', caseSensitive: false),
     RegExp(r'cardiac\s*arrest', caseSensitive: false),

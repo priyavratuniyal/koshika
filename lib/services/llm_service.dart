@@ -266,11 +266,14 @@ class LlmService {
   ///
   /// [userMessage] is the raw user input.
   /// [context] is the lab data context from [ChatContextBuilder].
+  /// [conversationHistory] is up to 2 prior turns (1 user + 1 assistant)
+  /// for resolving anaphora. History never overrides safety routing.
   /// Yields individual text tokens for the UI to concatenate.
   Stream<String> generateResponse(
     String userMessage, {
     String? context,
     String? systemPromptOverride,
+    List<ChatHistoryTurn>? conversationHistory,
   }) async* {
     if (_modelInfo.status != ModelStatus.loaded || _engine == null) {
       yield LlmStrings.errorModelNotLoaded;
@@ -289,6 +292,7 @@ class LlmService {
         userMessage,
         context,
         systemPromptOverride: systemPromptOverride,
+        conversationHistory: conversationHistory,
       );
 
       await for (final token in _engine!.generate(prompt)) {
@@ -333,10 +337,15 @@ class LlmService {
   ///
   /// ChatML is widely supported by instruction-tuned GGUF models
   /// (Qwen, SmolLM, Llama-3, and even Gemma in most quantizations).
+  ///
+  /// When [conversationHistory] is provided, prior turns are injected
+  /// between the system prompt and the current user turn for anaphora
+  /// resolution ("is that normal?" after "show my creatinine").
   String _formatPrompt(
     String userMessage,
     String? context, {
     String? systemPromptOverride,
+    List<ChatHistoryTurn>? conversationHistory,
   }) {
     final buf = StringBuffer();
 
@@ -344,6 +353,18 @@ class LlmService {
     buf.writeln('<|im_start|>system');
     buf.writeln(systemPromptOverride ?? systemPrompt);
     buf.writeln('<|im_end|>');
+
+    // Prior conversation turns (max 2: 1 user + 1 assistant)
+    if (conversationHistory != null) {
+      for (final turn in conversationHistory) {
+        final role = turn.isUser
+            ? LlmStrings.historyUserRole
+            : LlmStrings.historyAssistantRole;
+        buf.writeln('<|im_start|>$role');
+        buf.writeln(turn.content);
+        buf.writeln('<|im_end|>');
+      }
+    }
 
     // User turn — include lab data context inline so small models see it
     buf.writeln('<|im_start|>user');
@@ -426,4 +447,15 @@ class LlmService {
     await _disposeEngine();
     _statusController.close();
   }
+}
+
+/// A single turn in conversation history, used for prompt injection.
+///
+/// Lightweight DTO — intentionally decoupled from [ChatMessage] so the
+/// service layer doesn't depend on UI models.
+class ChatHistoryTurn {
+  final String content;
+  final bool isUser;
+
+  const ChatHistoryTurn({required this.content, required this.isUser});
 }
