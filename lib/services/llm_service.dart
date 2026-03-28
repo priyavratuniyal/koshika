@@ -272,6 +272,7 @@ class LlmService {
   Stream<String> generateResponse(
     String userMessage, {
     String? context,
+    String? systemPromptOverride,
   }) async* {
     if (_modelInfo.status != ModelStatus.loaded || _engine == null) {
       yield '[Error: Model is not loaded. Please load the model first.]';
@@ -286,7 +287,11 @@ class LlmService {
     _isGenerating = true;
 
     try {
-      final prompt = _formatPrompt(userMessage, context);
+      final prompt = _formatPrompt(
+        userMessage,
+        context,
+        systemPromptOverride: systemPromptOverride,
+      );
 
       await for (final token in _engine!.generate(prompt)) {
         if (!_isGenerating) break; // stopped by user
@@ -330,12 +335,16 @@ class LlmService {
   ///
   /// ChatML is widely supported by instruction-tuned GGUF models
   /// (Qwen, SmolLM, Llama-3, and even Gemma in most quantizations).
-  String _formatPrompt(String userMessage, String? context) {
+  String _formatPrompt(
+    String userMessage,
+    String? context, {
+    String? systemPromptOverride,
+  }) {
     final buf = StringBuffer();
 
     // System turn
     buf.writeln('<|im_start|>system');
-    buf.writeln(systemPrompt);
+    buf.writeln(systemPromptOverride ?? systemPrompt);
     buf.writeln('<|im_end|>');
 
     // User turn — include lab data context inline so small models see it
