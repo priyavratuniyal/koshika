@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 
+import '../constants/token_budgets.dart';
 import '../models/retrieval_result.dart';
 
 import '../main.dart';
@@ -15,8 +16,9 @@ import 'vector_store_service.dart';
 /// context windows (e.g. Gemma 3 1B IT at 1024 tokens ≈ 4000 chars).
 class ChatContextBuilder {
   /// Maximum characters allowed in the context string.
-  /// ~2000 chars ≈ 500 tokens, leaving room for system prompt + user query.
-  static const int maxContextChars = 2000;
+  /// Derived from [TokenBudgets.maxLabContextChars] so all budget decisions
+  /// live in one place.
+  static const int maxContextChars = TokenBudgets.maxLabContextChars;
 
   final VectorStoreService? _vectorStore;
 

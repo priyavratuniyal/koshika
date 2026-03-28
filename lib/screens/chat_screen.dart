@@ -8,9 +8,14 @@ import '../models/models.dart';
 import '../models/retrieval_result.dart';
 import '../constants/ai_prompts.dart';
 import '../constants/llm_strings.dart';
+import '../constants/token_budgets.dart';
+import '../constants/validation_strings.dart';
 import '../models/query_decision.dart';
 import '../services/chat_context_builder.dart';
 import '../services/citation_extractor.dart';
+import '../services/intent_classifier.dart';
+import '../services/llm_service.dart';
+import '../services/output_validator.dart';
 import '../services/query_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/koshika_design_system.dart';
@@ -40,7 +45,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   late final ChatContextBuilder _contextBuilder;
-  final QueryRouter _queryRouter = QueryRouter();
+  late final QueryRouter _queryRouter;
+  IntentClassifier? _intentClassifier;
   ChatSession? _currentSession;
   bool _hasShownPersistenceWarning = false;
   bool _hasLoggedUnknownRoleIndex = false;
@@ -53,6 +59,8 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _contextBuilder = ChatContextBuilder(vectorStore: vectorStoreService);
+    _initIntentClassifier();
+    _queryRouter = QueryRouter(classifier: _intentClassifier);
     _statusSubscription = llmService.modelStatusStream.listen((info) {
       if (mounted) {
         setState(() => _modelInfo = info);
@@ -62,6 +70,13 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_modelInfo.status == ModelStatus.ready) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadModel());
     }
+  }
+
+  void _initIntentClassifier() {
+    if (!embeddingService.isLoaded) return;
+    _intentClassifier = IntentClassifier(embeddingService);
+    // Initialize centroids in the background — non-blocking
+    _intentClassifier!.initialize();
   }
 
   @override
@@ -250,6 +265,41 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ─── Chat Logic ────────────────────────────────────────────────────
 
+  /// Extract up to 2 prior turns (1 user + 1 assistant) from the current
+  /// message list for conversation history injection.
+  ///
+  /// Returns null if there are fewer than 2 prior messages.
+  /// History content is truncated to [TokenBudgets.maxHistoryChars] to
+  /// stay within the context budget.
+  List<ChatHistoryTurn>? _buildConversationHistory() {
+    // Need at least 2 prior messages (user + assistant) before the current one
+    // The current user message is already added, so look at messages before it
+    if (_messages.length < 3) return null;
+
+    final history = <ChatHistoryTurn>[];
+    // Walk backwards from the message before the current user message
+    // (which is the last message in the list)
+    final startIndex = _messages.length - 2; // skip current user message
+    int charsUsed = 0;
+
+    for (int i = startIndex; i >= 0 && history.length < 2; i--) {
+      final msg = _messages[i];
+      if (msg.isError || msg.isStreaming) continue;
+      if (msg.role != ChatRole.user && msg.role != ChatRole.assistant) continue;
+
+      final content = msg.content;
+      if (charsUsed + content.length > TokenBudgets.maxHistoryChars) break;
+
+      history.insert(
+        0,
+        ChatHistoryTurn(content: content, isUser: msg.role == ChatRole.user),
+      );
+      charsUsed += content.length;
+    }
+
+    return history.isEmpty ? null : history;
+  }
+
   /// Display a pre-built response without invoking the LLM.
   void _addDeterministicResponse(String content, {ChatSession? session}) {
     final msg = ChatMessage(content: content, role: ChatRole.assistant);
@@ -280,10 +330,10 @@ class _ChatScreenState extends State<ChatScreen> {
     late final QueryRouteResult routeResult;
     try {
       final hasLabData = objectbox.getLatestResults().isNotEmpty;
-      routeResult = _queryRouter.route(text, hasLabData: hasLabData);
+      routeResult = await _queryRouter.route(text, hasLabData: hasLabData);
     } catch (e) {
       // If routing fails (e.g. ObjectBox error), fall through to LLM
-      debugPrint('Query routing failed, falling through to LLM: $e');
+      debugPrint('${LlmStrings.routingFailedLog}$e');
       routeResult = const QueryRouteResult(
         decision: QueryDecision.answerGeneralHealth,
       );
@@ -318,6 +368,10 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
 
+    // Collect conversation history (max 2 prior turns: 1 user + 1 assistant)
+    // for anaphora resolution ("is that normal?" after "show my creatinine").
+    final history = _buildConversationHistory();
+
     if (!mounted) return;
 
     // Add placeholder assistant message (streaming)
@@ -345,6 +399,7 @@ class _ChatScreenState extends State<ChatScreen> {
           text,
           context: context,
           systemPromptOverride: promptOverride,
+          conversationHistory: history,
         )
         .listen(
           (token) {
@@ -362,8 +417,23 @@ class _ChatScreenState extends State<ChatScreen> {
           onDone: () {
             if (mounted) {
               var finalContent = tokenBuffer.toString();
+
+              // Validate output before showing to user
+              final validation = OutputValidator.validate(
+                finalContent,
+                labContext: context,
+              );
+              if (validation != ValidationResult.passed) {
+                finalContent = OutputValidator.applyFallback(
+                  validation,
+                  finalContent,
+                );
+              }
+
               // Append citation footer if we have retrieved docs
-              if (finalContent.isNotEmpty && retrievedDocs.isNotEmpty) {
+              if (finalContent.isNotEmpty &&
+                  retrievedDocs.isNotEmpty &&
+                  validation == ValidationResult.passed) {
                 finalContent = CitationExtractor.appendSourceFooter(
                   finalContent,
                   retrievedDocs,
@@ -373,7 +443,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 _messages[assistantIndex] = _messages[assistantIndex].copyWith(
                   isStreaming: false,
                   content: finalContent.isEmpty
-                      ? LlmStrings.errorEmptyResponse
+                      ? ValidationStrings.genericFallback
                       : finalContent,
                 );
               });

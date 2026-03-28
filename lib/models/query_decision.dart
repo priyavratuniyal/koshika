@@ -49,7 +49,15 @@ class QueryRouteResult {
   /// of calling the LLM. Null means "proceed with model inference".
   final String? deterministicResponse;
 
-  const QueryRouteResult({required this.decision, this.deterministicResponse});
+  /// Classification confidence from the Stage 2 embedding classifier.
+  /// Null when only Stage 1 (regex) was used.
+  final double? confidence;
+
+  const QueryRouteResult({
+    required this.decision,
+    this.deterministicResponse,
+    this.confidence,
+  });
 
   /// Whether this result requires an LLM call.
   bool get requiresLlm => deterministicResponse == null;
