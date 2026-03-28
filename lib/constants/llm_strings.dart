@@ -65,4 +65,50 @@ abstract final class LlmStrings {
   /// Debug log when query routing fails.
   static const String routingFailedLog =
       'Query routing failed, falling through to LLM: ';
+
+  /// Debug log when retrying after empty/failed generation.
+  static const String retryingGenerationLog =
+      'Generation produced empty/failed output, retrying once';
+
+  // ─── Intent Classifier Debug Logs ──────────────────────────────────
+
+  /// Logged when centroids are loaded from disk cache.
+  static const String classifierCacheLoaded =
+      'IntentClassifier: loaded cached centroids';
+
+  /// Logged when centroids are computed fresh from examples.
+  static const String classifierCentroidsComputed =
+      'IntentClassifier: computed category centroids';
+
+  /// Logged when centroid initialization fails.
+  static const String classifierInitFailed =
+      'IntentClassifier.initialize failed: ';
+
+  /// Logged when centroids are written to disk cache.
+  static const String classifierCacheSaved =
+      'IntentClassifier: centroids cached to disk';
+
+  /// Logged when centroid cache write fails.
+  static const String classifierCacheSaveFailed =
+      'IntentClassifier: failed to cache centroids: ';
+
+  /// Logged when cached centroids have a version mismatch.
+  static const String classifierCacheVersionMismatch =
+      'IntentClassifier: cache version mismatch, recomputing';
+
+  /// Logged when centroid cache read fails.
+  static const String classifierCacheLoadFailed =
+      'IntentClassifier: failed to load cache: ';
+
+  /// Logged when the in-memory centroid cache is cleared.
+  static const String classifierCacheCleared =
+      'IntentClassifier: cache cleared';
+
+  /// Logged when cache clearing fails.
+  static const String classifierCacheClearFailed =
+      'IntentClassifier.clearCache failed: ';
+
+  /// Logged when a classify() call fails.
+  static const String classifierClassifyFailed =
+      'IntentClassifier.classify failed: ';
 }

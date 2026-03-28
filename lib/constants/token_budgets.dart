@@ -57,4 +57,36 @@ abstract final class TokenBudgets {
   /// Repetition threshold — if more than this fraction of the response
   /// consists of repeated phrases, flag as repetitive.
   static const double repetitionThreshold = 0.40;
+
+  /// Minimum output length (chars) before repetition detection kicks in.
+  static const int minLengthForRepetitionCheck = 100;
+
+  /// Minimum sentence length (chars) to count as a meaningful sentence
+  /// during repetition analysis.
+  static const int minSentenceLengthChars = 10;
+
+  /// Minimum number of sentences required to trigger repetition detection.
+  static const int minSentenceCountForRepetition = 3;
+
+  /// Minimum word count before trigram-based repetition analysis applies.
+  static const int minWordsForTrigramCheck = 12;
+
+  /// Maximum number of retries on empty or crashed generation before
+  /// showing a fallback response.
+  static const int maxGenerationRetries = 1;
+
+  /// Minimum output length (chars) before garbled detection kicks in.
+  static const int minLengthForGarbledCheck = 50;
+
+  /// Non-ASCII ratio above which output is flagged as garbled.
+  /// 0.30 = more than 30% non-ASCII characters → likely garbled.
+  static const double garbledNonAsciiThreshold = 0.30;
+
+  /// Average word length above which output is flagged as garbled.
+  /// Normal English averages ~5 chars/word; garbled text often has 15+.
+  static const double garbledAvgWordLengthThreshold = 15.0;
+
+  /// Fraction of words that must be "real" (contain a vowel) to pass.
+  /// Below this threshold, the output is flagged as garbled.
+  static const double garbledVowelWordThreshold = 0.40;
 }

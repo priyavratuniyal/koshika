@@ -1,10 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
 import '../constants/intent_examples.dart';
+import '../constants/llm_strings.dart';
 import '../models/query_decision.dart';
 import 'llm_embedding_service.dart';
+import 'model_downloader.dart';
 
 /// Result of the Stage 2 embedding-based classification.
 class ClassificationResult {
@@ -34,6 +38,8 @@ class ClassificationResult {
 /// Emergency detection is NOT handled here — it stays regex-only in
 /// [IntentPrefilter] for safety.
 class IntentClassifier {
+  static const _cacheFilename = 'intent_centroids.json';
+
   final LlmEmbeddingService _embedder;
 
   /// Pre-computed centroid vectors for each category.
@@ -47,6 +53,9 @@ class IntentClassifier {
 
   /// Pre-compute category centroids from canonical examples.
   ///
+  /// Tries to load cached centroids from disk first. If no cache exists
+  /// (or it's stale), computes fresh centroids and persists them.
+  ///
   /// Must be called after the embedding model is loaded. Safe to call
   /// multiple times — subsequent calls are no-ops if already initialized.
   Future<void> initialize() async {
@@ -54,6 +63,15 @@ class IntentClassifier {
     if (!_embedder.isLoaded) return;
 
     try {
+      // Try loading from cache first
+      final cached = await _loadCachedCentroids();
+      if (cached != null) {
+        _centroids = cached;
+        debugPrint(LlmStrings.classifierCacheLoaded);
+        return;
+      }
+
+      // Compute fresh centroids
       final categories = <PrefilterResult, List<String>>{
         PrefilterResult.likelyLabQuery: IntentExamples.labInterpretation,
         PrefilterResult.likelyHealthQuery:
@@ -69,13 +87,26 @@ class IntentClassifier {
       }
 
       _centroids = centroids;
-      debugPrint(
-        'IntentClassifier: initialized with ${centroids.length} '
-        'category centroids',
-      );
+      debugPrint(LlmStrings.classifierCentroidsComputed);
+
+      // Persist to disk for next launch
+      await _saveCentroids(centroids);
     } catch (e) {
-      debugPrint('IntentClassifier.initialize failed: $e');
+      debugPrint('${LlmStrings.classifierInitFailed}$e');
       // Non-fatal — classifier stays unavailable, router uses regex only
+    }
+  }
+
+  /// Invalidate the cached centroids (e.g. when examples change).
+  static Future<void> clearCache() async {
+    try {
+      final file = await _getCacheFile();
+      if (file.existsSync()) {
+        file.deleteSync();
+        debugPrint(LlmStrings.classifierCacheCleared);
+      }
+    } catch (e) {
+      debugPrint('${LlmStrings.classifierCacheClearFailed}$e');
     }
   }
 
@@ -103,7 +134,7 @@ class IntentClassifier {
 
       return ClassificationResult(intent: bestCategory, confidence: bestScore);
     } catch (e) {
-      debugPrint('IntentClassifier.classify failed: $e');
+      debugPrint('${LlmStrings.classifierClassifyFailed}$e');
       return null;
     }
   }
@@ -151,4 +182,79 @@ class IntentClassifier {
     if (norm == 0.0) return vec;
     return [for (final v in vec) v / norm];
   }
+
+  // ─── Centroid Cache I/O ───────────────────────────────────────────
+
+  static Future<File> _getCacheFile() async {
+    final dir = await ModelDownloader.getModelsDir();
+    return File('${dir.path}/$_cacheFilename');
+  }
+
+  /// Serialize centroids to a JSON file alongside the model files.
+  ///
+  /// Format: `{ "version": <int>, "centroids": { "<enum_name>": [<doubles>] } }`
+  /// Version tracks the canonical example count so stale caches are
+  /// automatically discarded when examples change.
+  Future<void> _saveCentroids(
+    Map<PrefilterResult, List<double>> centroids,
+  ) async {
+    try {
+      final file = await _getCacheFile();
+      final json = {
+        'version': _cacheVersion,
+        'centroids': {
+          for (final entry in centroids.entries) entry.key.name: entry.value,
+        },
+      };
+      await file.writeAsString(jsonEncode(json));
+      debugPrint(LlmStrings.classifierCacheSaved);
+    } catch (e) {
+      debugPrint('${LlmStrings.classifierCacheSaveFailed}$e');
+    }
+  }
+
+  /// Load cached centroids from disk. Returns null if the cache is
+  /// missing, corrupt, or from a different version.
+  Future<Map<PrefilterResult, List<double>>?> _loadCachedCentroids() async {
+    try {
+      final file = await _getCacheFile();
+      if (!file.existsSync()) return null;
+
+      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+
+      // Version mismatch → stale cache
+      if (raw['version'] != _cacheVersion) {
+        debugPrint(LlmStrings.classifierCacheVersionMismatch);
+        return null;
+      }
+
+      final centroidsJson = raw['centroids'] as Map<String, dynamic>;
+      final centroids = <PrefilterResult, List<double>>{};
+
+      for (final entry in centroidsJson.entries) {
+        final intent = PrefilterResult.values.firstWhere(
+          (v) => v.name == entry.key,
+          orElse: () => PrefilterResult.ambiguous,
+        );
+        if (intent == PrefilterResult.ambiguous) continue;
+
+        centroids[intent] = (entry.value as List<dynamic>)
+            .map((v) => (v as num).toDouble())
+            .toList();
+      }
+
+      if (centroids.length < 3) return null; // incomplete cache
+      return centroids;
+    } catch (e) {
+      debugPrint('${LlmStrings.classifierCacheLoadFailed}$e');
+      return null;
+    }
+  }
+
+  /// Cache version derived from the total number of canonical examples.
+  /// Changes whenever examples are added/removed, invalidating the cache.
+  static int get _cacheVersion =>
+      IntentExamples.labInterpretation.length +
+      IntentExamples.generalHealthEducation.length +
+      IntentExamples.offTopic.length;
 }
