@@ -62,11 +62,14 @@ class ModelDownloader {
   /// Download [url] to the models directory as [filename].
   ///
   /// Resumes partial downloads via HTTP Range headers.
+  /// When [authToken] is provided, it is sent as a Bearer token in the
+  /// Authorization header — required for gated HuggingFace repos.
   /// Returns the final file path on success.
   Future<String> download(
     String url,
     String filename, {
     DownloadProgressCallback? onProgress,
+    String? authToken,
   }) async {
     _cancelled = false;
 
@@ -86,6 +89,12 @@ class ModelDownloader {
       }
 
       final request = await _client!.getUrl(Uri.parse(url));
+      if (authToken != null && authToken.isNotEmpty) {
+        request.headers.add(
+          HttpHeaders.authorizationHeader,
+          'Bearer $authToken',
+        );
+      }
       if (startByte > 0) {
         request.headers.add(HttpHeaders.rangeHeader, 'bytes=$startByte-');
       }

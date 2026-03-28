@@ -9,6 +9,7 @@ import '../constants/llm_strings.dart';
 import '../models/llm_model_config.dart';
 import '../models/model_info.dart';
 import '../utils/error_classifier.dart';
+import 'hf_token_service.dart';
 import 'model_downloader.dart';
 
 /// Service managing an on-device GGUF chat model via llama.cpp.
@@ -173,9 +174,11 @@ class LlmService {
     required int downloadOperationId,
   }) async {
     try {
+      final hfToken = await HfTokenService.getToken();
       await downloader.download(
         config.downloadUrl,
         config.filename,
+        authToken: hfToken,
         onProgress: (received, total) {
           if (!_isActiveDownload(downloadOperationId, downloader)) return;
           final pct = total > 0 ? (received * 100 ~/ total) : 0;

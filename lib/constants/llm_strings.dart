@@ -56,6 +56,42 @@ abstract final class LlmStrings {
   /// ChatML role tag for prior assistant turns injected as history.
   static const String historyAssistantRole = 'assistant';
 
+  // ─── Hugging Face Token UI ──────────────────────────────────────────
+
+  /// Section title in Settings.
+  static const String hfTokenSectionTitle = 'Hugging Face Token';
+
+  /// Explanation shown above the token input field.
+  static const String hfTokenDescription =
+      'Some models are gated and require a Hugging Face access token to '
+      'download. You can create one at huggingface.co/settings/tokens.';
+
+  /// Info banner text explaining common issues.
+  static const String hfTokenInfoMessage =
+      'Having a token does not guarantee access. You must also:\n'
+      '  1. Accept the model\'s license on its HuggingFace page\n'
+      '  2. Ensure your token has "Read" permission\n\n'
+      'If downloads fail with 401/403 errors after adding a token, visit '
+      'the model page and accept the license agreement, then retry.';
+
+  /// Label for the token text field.
+  static const String hfTokenFieldLabel = 'Access Token';
+
+  /// Hint text for the token text field.
+  static const String hfTokenFieldHint = 'hf_...';
+
+  /// Shown when token is saved successfully.
+  static const String hfTokenSaved = 'Token saved';
+
+  /// Shown when token is cleared.
+  static const String hfTokenCleared = 'Token removed';
+
+  /// Button label to save the token.
+  static const String hfTokenSaveButton = 'Save';
+
+  /// Button label to clear the token.
+  static const String hfTokenClearButton = 'Clear';
+
   // ─── Chat Screen Copy ────────────────────────────────────────────────
 
   /// Snackbar shown when chat message persistence fails.
