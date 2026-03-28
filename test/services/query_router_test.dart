@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:koshika/constants/response_templates.dart';
-import 'package:koshika/constants/validation_strings.dart';
 import 'package:koshika/models/query_decision.dart';
+import 'package:koshika/services/llm_service.dart';
 import 'package:koshika/services/query_router.dart';
 
 void main() {
@@ -71,7 +71,7 @@ void main() {
 
     // ─── Health Query ─────────────────────────────────────────────────
 
-    test('health query → answerGeneralHealth, LLM', () async {
+    test('health query without data → answerGeneralHealth, LLM', () async {
       final result = await router.route(
         'What is cholesterol?',
         hasLabData: false,
@@ -79,6 +79,18 @@ void main() {
       expect(result.decision, QueryDecision.answerGeneralHealth);
       expect(result.requiresLlm, true);
     });
+
+    test(
+      'health query with data → answerWithLabContext (enrichment)',
+      () async {
+        final result = await router.route(
+          'What is cholesterol?',
+          hasLabData: true,
+        );
+        expect(result.decision, QueryDecision.answerWithLabContext);
+        expect(result.requiresLlm, true);
+      },
+    );
 
     // ─── Ambiguous ────────────────────────────────────────────────────
 
@@ -183,6 +195,65 @@ void main() {
       );
       expect(result.decision, QueryDecision.answerWithLabContext);
       expect(result.requiresLlm, true);
+    });
+
+    // ─── History-Aware Routing ─────────────────────────────────────
+
+    test('ambiguous after lab query → answerWithLabContext', () async {
+      final result = await router.route(
+        'is that normal?',
+        hasLabData: true,
+        conversationHistory: [
+          const ChatHistoryTurn(
+            content: 'Why is my creatinine high?',
+            isUser: true,
+          ),
+          const ChatHistoryTurn(
+            content: 'Your creatinine is 1.8 mg/dl.',
+            isUser: false,
+          ),
+        ],
+      );
+      expect(result.decision, QueryDecision.answerWithLabContext);
+    });
+
+    test(
+      'ambiguous after lab query without data → needLabReportFirst',
+      () async {
+        final result = await router.route(
+          'what does that mean?',
+          hasLabData: false,
+          conversationHistory: [
+            const ChatHistoryTurn(content: 'What is my TSH?', isUser: true),
+            const ChatHistoryTurn(
+              content: 'Please upload a report.',
+              isUser: false,
+            ),
+          ],
+        );
+        expect(result.decision, QueryDecision.needLabReportFirst);
+      },
+    );
+
+    test('ambiguous without history → answerGeneralHealth', () async {
+      final result = await router.route('is that normal?', hasLabData: true);
+      expect(result.decision, QueryDecision.answerGeneralHealth);
+    });
+
+    test('ambiguous after non-lab history → answerGeneralHealth', () async {
+      final result = await router.route(
+        'tell me more',
+        hasLabData: true,
+        conversationHistory: [
+          const ChatHistoryTurn(content: 'What is cholesterol?', isUser: true),
+          const ChatHistoryTurn(
+            content: 'Cholesterol is a waxy substance...',
+            isUser: false,
+          ),
+        ],
+      );
+      // Prior was health (not lab) — no history promotion, stays general
+      expect(result.decision, QueryDecision.answerGeneralHealth);
     });
   });
 }

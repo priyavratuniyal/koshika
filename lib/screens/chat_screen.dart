@@ -326,11 +326,19 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _scrollToBottom();
 
+    // Collect conversation history before routing — used for both
+    // history-aware routing and prompt injection.
+    final history = _buildConversationHistory();
+
     // Route the query — may short-circuit with a deterministic response
     late final QueryRouteResult routeResult;
     try {
       final hasLabData = objectbox.getLatestResults().isNotEmpty;
-      routeResult = await _queryRouter.route(text, hasLabData: hasLabData);
+      routeResult = await _queryRouter.route(
+        text,
+        hasLabData: hasLabData,
+        conversationHistory: history,
+      );
     } catch (e) {
       // If routing fails (e.g. ObjectBox error), fall through to LLM
       debugPrint('${LlmStrings.routingFailedLog}$e');
@@ -368,10 +376,6 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
 
-    // Collect conversation history (max 2 prior turns: 1 user + 1 assistant)
-    // for anaphora resolution ("is that normal?" after "show my creatinine").
-    final history = _buildConversationHistory();
-
     if (!mounted) return;
 
     // Add placeholder assistant message (streaming)
@@ -381,22 +385,45 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    // Start streaming generation
-    final assistantIndex = _messages.length - 1;
+    _startGeneration(
+      query: text,
+      context: context,
+      promptOverride: promptOverride,
+      history: history,
+      retrievedDocs: retrievedDocs,
+      activeSession: activeSession,
+      assistantIndex: _messages.length - 1,
+    );
+  }
+
+  /// Start streaming generation with retry support.
+  ///
+  /// On empty output or generation error, retries up to
+  /// [TokenBudgets.maxGenerationRetries] times before showing a fallback.
+  void _startGeneration({
+    required String query,
+    required String? context,
+    required String? promptOverride,
+    required List<ChatHistoryTurn>? history,
+    required List<RetrievalResult> retrievedDocs,
+    required ChatSession? activeSession,
+    required int assistantIndex,
+    int attempt = 0,
+  }) {
     final tokenBuffer = StringBuffer();
-    var assistantPersistAttempted = false;
+    var persistAttempted = false;
 
     void persistAssistantOnce() {
       final session = activeSession;
-      if (session == null || assistantPersistAttempted) return;
-      assistantPersistAttempted = true;
+      if (session == null || persistAttempted) return;
+      persistAttempted = true;
       _persistMessage(session, _messages[assistantIndex]);
     }
 
     _generationSubscription?.cancel();
     _generationSubscription = llmService
         .generateResponse(
-          text,
+          query,
           context: context,
           systemPromptOverride: promptOverride,
           conversationHistory: history,
@@ -415,51 +442,99 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           },
           onDone: () {
-            if (mounted) {
-              var finalContent = tokenBuffer.toString();
+            if (!mounted) return;
+            var finalContent = tokenBuffer.toString();
 
-              // Validate output before showing to user
-              final validation = OutputValidator.validate(
-                finalContent,
-                labContext: context,
-              );
-              if (validation != ValidationResult.passed) {
-                finalContent = OutputValidator.applyFallback(
-                  validation,
-                  finalContent,
-                );
-              }
+            // Validate output before showing to user
+            final validation = OutputValidator.validate(
+              finalContent,
+              labContext: context,
+            );
 
-              // Append citation footer if we have retrieved docs
-              if (finalContent.isNotEmpty &&
-                  retrievedDocs.isNotEmpty &&
-                  validation == ValidationResult.passed) {
-                finalContent = CitationExtractor.appendSourceFooter(
-                  finalContent,
-                  retrievedDocs,
-                );
-              }
+            // Retry on empty or garbled output (up to max retries)
+            final isRetriable =
+                validation == ValidationResult.empty ||
+                validation == ValidationResult.garbled;
+            if (isRetriable && attempt < TokenBudgets.maxGenerationRetries) {
+              debugPrint(LlmStrings.retryingGenerationLog);
+              // Reset the placeholder for the next attempt
               setState(() {
                 _messages[assistantIndex] = _messages[assistantIndex].copyWith(
-                  isStreaming: false,
-                  content: finalContent.isEmpty
-                      ? ValidationStrings.genericFallback
-                      : finalContent,
+                  content: '',
+                  isStreaming: true,
                 );
               });
-              persistAssistantOnce();
-              _scrollToBottom();
+              _startGeneration(
+                query: query,
+                context: context,
+                promptOverride: promptOverride,
+                history: history,
+                retrievedDocs: retrievedDocs,
+                activeSession: activeSession,
+                assistantIndex: assistantIndex,
+                attempt: attempt + 1,
+              );
+              return;
             }
+
+            if (validation != ValidationResult.passed) {
+              finalContent = OutputValidator.applyFallback(
+                validation,
+                finalContent,
+              );
+            }
+
+            // Append citation footer if we have retrieved docs
+            if (finalContent.isNotEmpty &&
+                retrievedDocs.isNotEmpty &&
+                validation == ValidationResult.passed) {
+              finalContent = CitationExtractor.appendSourceFooter(
+                finalContent,
+                retrievedDocs,
+              );
+            }
+            setState(() {
+              _messages[assistantIndex] = _messages[assistantIndex].copyWith(
+                isStreaming: false,
+                content: finalContent.isEmpty
+                    ? ValidationStrings.genericFallback
+                    : finalContent,
+              );
+            });
+            persistAssistantOnce();
+            _scrollToBottom();
           },
           onError: (e) {
-            if (mounted) {
+            if (!mounted) return;
+
+            // Retry once on error before showing error message
+            if (attempt < TokenBudgets.maxGenerationRetries) {
+              debugPrint(LlmStrings.retryingGenerationLog);
               setState(() {
-                _messages[assistantIndex] = ChatMessage.error(
-                  '${LlmStrings.errorDuringGeneration}$e',
+                _messages[assistantIndex] = _messages[assistantIndex].copyWith(
+                  content: '',
+                  isStreaming: true,
                 );
               });
-              persistAssistantOnce();
+              _startGeneration(
+                query: query,
+                context: context,
+                promptOverride: promptOverride,
+                history: history,
+                retrievedDocs: retrievedDocs,
+                activeSession: activeSession,
+                assistantIndex: assistantIndex,
+                attempt: attempt + 1,
+              );
+              return;
             }
+
+            setState(() {
+              _messages[assistantIndex] = ChatMessage.error(
+                '${LlmStrings.errorDuringGeneration}$e',
+              );
+            });
+            persistAssistantOnce();
           },
         );
   }
