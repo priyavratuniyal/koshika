@@ -4,6 +4,7 @@ import '../models/query_decision.dart';
 import '../models/strictness_mode.dart';
 import 'intent_classifier.dart';
 import 'intent_prefilter.dart';
+import 'llm_service.dart';
 
 /// Routes a user message to a [QueryDecision] by combining the deterministic
 /// [IntentPrefilter] result with lab-data availability, optional Stage 2
@@ -24,9 +25,14 @@ class QueryRouter {
   ///
   /// [hasLabData] should be `true` when the user has at least one imported
   /// lab report with parsed biomarker results.
+  ///
+  /// [conversationHistory] is an optional list of prior turns used to
+  /// resolve ambiguous follow-up queries (e.g. "is that normal?" after
+  /// a lab-related exchange).
   Future<QueryRouteResult> route(
     String message, {
     required bool hasLabData,
+    List<ChatHistoryTurn>? conversationHistory,
   }) async {
     final prefilter = IntentPrefilter.classify(message);
 
@@ -57,20 +63,67 @@ class QueryRouter {
         );
 
       case PrefilterResult.likelyHealthQuery:
-        return _applyStrictnessMode(
-          const QueryRouteResult(decision: QueryDecision.answerGeneralHealth),
-        );
+        return _routeHealthQuery(hasLabData: hasLabData);
 
       case PrefilterResult.ambiguous:
-        return _routeAmbiguous(message, hasLabData: hasLabData);
+        return _routeAmbiguous(
+          message,
+          hasLabData: hasLabData,
+          conversationHistory: conversationHistory,
+        );
     }
   }
 
-  /// Route ambiguous messages using Stage 2 classifier when available.
+  /// Route a health query, enriching with lab context when available.
+  ///
+  /// When the user asks a general health question (e.g. "what is cholesterol?")
+  /// and has lab data, we route to [answerWithLabContext] so the model can
+  /// reference their actual values for a richer answer.
+  QueryRouteResult _routeHealthQuery({required bool hasLabData}) {
+    if (hasLabData) {
+      return const QueryRouteResult(
+        decision: QueryDecision.answerWithLabContext,
+      );
+    }
+    return _applyStrictnessMode(
+      const QueryRouteResult(decision: QueryDecision.answerGeneralHealth),
+    );
+  }
+
+  /// Route ambiguous messages using conversation history and Stage 2 classifier.
+  ///
+  /// History-aware routing: if the prior user turn was a lab query,
+  /// ambiguous follow-ups like "is that normal?" or "what does that mean?"
+  /// are promoted to lab queries instead of falling through to general health.
   Future<QueryRouteResult> _routeAmbiguous(
     String message, {
     required bool hasLabData,
+    List<ChatHistoryTurn>? conversationHistory,
   }) async {
+    // History-aware routing — check if prior context implies lab intent
+    if (conversationHistory != null && conversationHistory.isNotEmpty) {
+      final priorUserTurn = conversationHistory
+          .where((t) => t.isUser)
+          .lastOrNull;
+
+      if (priorUserTurn != null) {
+        final priorIntent = IntentPrefilter.classify(priorUserTurn.content);
+        if (priorIntent == PrefilterResult.likelyLabQuery) {
+          // Prior turn was a lab query — promote this ambiguous follow-up
+          if (hasLabData) {
+            return const QueryRouteResult(
+              decision: QueryDecision.answerWithLabContext,
+            );
+          }
+          return const QueryRouteResult(
+            decision: QueryDecision.needLabReportFirst,
+            deterministicResponse: ResponseTemplates.needLabReport,
+          );
+        }
+      }
+    }
+
+    // Fall through to Stage 2 classifier
     final classifier = _classifier;
     if (classifier == null || !classifier.isReady) {
       // No Stage 2 — default to general health (safe fallback)
