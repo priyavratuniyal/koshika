@@ -5,6 +5,7 @@ import 'package:llamadart/llamadart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/ai_prompts.dart';
+import '../constants/llm_strings.dart';
 import '../models/llm_model_config.dart';
 import '../models/model_info.dart';
 import '../utils/error_classifier.dart';
@@ -236,10 +237,7 @@ class LlmService {
   /// Load the downloaded GGUF into memory.
   Future<void> loadModel() async {
     if (_modelInfo.status != ModelStatus.ready) {
-      throw StateError(
-        'Cannot load model — current status is ${_modelInfo.status.name}. '
-        'Model must be downloaded first.',
-      );
+      throw StateError(LlmStrings.errorCannotLoad(_modelInfo.status.name));
     }
 
     _updateStatus(_modelInfo.copyWith(status: ModelStatus.loading));
@@ -275,12 +273,12 @@ class LlmService {
     String? systemPromptOverride,
   }) async* {
     if (_modelInfo.status != ModelStatus.loaded || _engine == null) {
-      yield '[Error: Model is not loaded. Please load the model first.]';
+      yield LlmStrings.errorModelNotLoaded;
       return;
     }
 
     if (_isGenerating) {
-      yield '[Error: Another response is still being generated.]';
+      yield LlmStrings.errorAlreadyGenerating;
       return;
     }
 
@@ -300,7 +298,7 @@ class LlmService {
     } catch (e) {
       final msg = e.toString();
       final truncated = msg.length > 150 ? '${msg.substring(0, 150)}...' : msg;
-      yield '\n\n[Generation error: $truncated]';
+      yield '\n\n${LlmStrings.errorGenerationPrefix}$truncated]';
     } finally {
       _isGenerating = false;
     }
@@ -350,10 +348,10 @@ class LlmService {
     // User turn — include lab data context inline so small models see it
     buf.writeln('<|im_start|>user');
     if (context != null && context.isNotEmpty) {
-      buf.writeln('My lab data:');
+      buf.writeln(LlmStrings.labContextLabel);
       buf.writeln(context);
       buf.writeln();
-      buf.writeln('Question: $userMessage');
+      buf.writeln('${LlmStrings.questionPrefix}$userMessage');
     } else {
       buf.writeln(userMessage);
     }

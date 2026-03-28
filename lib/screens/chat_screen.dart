@@ -7,6 +7,7 @@ import '../main.dart';
 import '../models/models.dart';
 import '../models/retrieval_result.dart';
 import '../constants/ai_prompts.dart';
+import '../constants/llm_strings.dart';
 import '../models/query_decision.dart';
 import '../services/chat_context_builder.dart';
 import '../services/citation_extractor.dart';
@@ -111,9 +112,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted || _hasShownPersistenceWarning) return;
     _hasShownPersistenceWarning = true;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Could not save chat history for one or more messages.'),
-      ),
+      const SnackBar(content: Text(LlmStrings.persistenceWarning)),
     );
   }
 
@@ -374,7 +373,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 _messages[assistantIndex] = _messages[assistantIndex].copyWith(
                   isStreaming: false,
                   content: finalContent.isEmpty
-                      ? 'I wasn\'t able to generate a response. Please try again.'
+                      ? LlmStrings.errorEmptyResponse
                       : finalContent,
                 );
               });
@@ -386,7 +385,7 @@ class _ChatScreenState extends State<ChatScreen> {
             if (mounted) {
               setState(() {
                 _messages[assistantIndex] = ChatMessage.error(
-                  'An error occurred during generation: $e',
+                  '${LlmStrings.errorDuringGeneration}$e',
                 );
               });
               persistAssistantOnce();
@@ -407,8 +406,8 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages[_messages.length - 1] = last.copyWith(
           isStreaming: false,
           content: last.content.isEmpty
-              ? '[Generation stopped]'
-              : '${last.content}\n\n[Generation stopped]',
+              ? LlmStrings.generationStopped
+              : '${last.content}\n\n${LlmStrings.generationStopped}',
         );
       });
       final session = _currentSession;
