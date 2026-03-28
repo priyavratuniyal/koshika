@@ -88,10 +88,84 @@ void main() {
       expect(OutputValidator.validate(output), ValidationResult.passed);
     });
 
+    // ─── Garbled Output ───────────────────────────────────────────────
+
+    test('detects high non-ASCII ratio as garbled', () {
+      // Build a string with >30% non-ASCII characters
+      final garbled = 'ÿ' * 40 + 'normal text here abcdef';
+      expect(OutputValidator.validate(garbled), ValidationResult.garbled);
+    });
+
+    test('detects consonant-only gibberish as garbled', () {
+      // Words without vowels
+      final garbled = List.generate(
+        20,
+        (_) => 'bcrdfg hklmnp qrstvw xyzbrn',
+      ).join(' ');
+      expect(OutputValidator.validate(garbled), ValidationResult.garbled);
+    });
+
+    test('detects abnormally long words as garbled', () {
+      // Average word length > 15
+      final garbled = List.generate(
+        10,
+        (_) => 'abcdefghijklmnopqrstuvwxyz',
+      ).join(' ');
+      expect(OutputValidator.validate(garbled), ValidationResult.garbled);
+    });
+
+    test('passes normal text with some non-ASCII', () {
+      // Medical text with a few special chars should pass
+      const output =
+          'Your TSH level of 2.5 mIU/L is within the normal range. '
+          'The reference range is 0.4–4.0 mIU/L. This suggests healthy '
+          'thyroid function.';
+      expect(OutputValidator.validate(output), ValidationResult.passed);
+    });
+
     // ─── Excessive Length ─────────────────────────────────────────────
 
     test('detects overly long response', () {
-      final output = 'A' * 2000;
+      // Use text that passes garbled + repetition checks but exceeds length.
+      // Each sentence is unique to avoid repetition detection.
+      final sentences = [
+        'Cholesterol is a waxy substance found in blood.',
+        'High-density lipoprotein helps remove other forms of cholesterol.',
+        'Low-density lipoprotein is often called bad cholesterol.',
+        'Triglycerides are another type of fat found in blood.',
+        'A lipid panel measures all major types of fats.',
+        'Dietary changes can help improve cholesterol levels.',
+        'Exercise increases high-density lipoprotein cholesterol.',
+        'Genetics play a role in cholesterol levels.',
+        'Statins are commonly prescribed to lower cholesterol.',
+        'Regular testing helps monitor cardiovascular health.',
+        'Hemoglobin carries oxygen throughout the body.',
+        'Iron deficiency can lead to low hemoglobin levels.',
+        'Complete blood count reveals many important markers.',
+        'White blood cells fight infection and disease.',
+        'Platelets help with blood clotting processes.',
+        'Creatinine levels indicate kidney function status.',
+        'Estimated GFR measures how well kidneys filter blood.',
+        'Blood urea nitrogen also reflects kidney health.',
+        'Thyroid stimulating hormone regulates metabolism rate.',
+        'Free T4 is the active form of thyroid hormone.',
+        'Vitamin D supports bone health and immune function.',
+        'Calcium levels affect muscle and nerve function.',
+        'Liver enzymes indicate hepatic function status.',
+        'Albumin is a protein made by the liver.',
+        'Bilirubin is a waste product from red blood cells.',
+        'Potassium balance is critical for heart rhythm stability.',
+        'Sodium levels help regulate fluid balance in the body.',
+        'Magnesium supports hundreds of enzymatic reactions daily.',
+        'Phosphorus works with calcium for strong bones.',
+        'Uric acid buildup can cause gout and joint pain.',
+        'Ferritin reflects the iron stores in your body.',
+        'Transferrin saturation shows iron transport capacity.',
+        'Reticulocyte count indicates new red blood cell production.',
+        'Mean corpuscular volume describes red blood cell size.',
+      ];
+      final output = sentences.join(' ');
+      expect(output.length, greaterThan(1500));
       expect(OutputValidator.validate(output), ValidationResult.tooLong);
     });
 
@@ -141,6 +215,13 @@ void main() {
       expect(
         OutputValidator.applyFallback(ValidationResult.prohibited, 'diagnose'),
         ValidationStrings.prohibitedContentFallback,
+      );
+    });
+
+    test('garbled → garbled fallback', () {
+      expect(
+        OutputValidator.applyFallback(ValidationResult.garbled, 'xyzbrn'),
+        ValidationStrings.garbledFallback,
       );
     });
 
