@@ -28,7 +28,7 @@ Unlike PDF readers, **it actually understands your lab values.**
 
 ## What it does
 
-- **Parses any Indian lab PDF** — 4 regex patterns + fuzzy matching + OCR fallback. Works with Thyrocare, Dr. Lal, SRL, Metropolis, and more.
+- **Parses a wide range of Indian lab PDFs** — 4 regex patterns + fuzzy matching + OCR fallback. Works with Thyrocare, Dr. Lal, SRL, Metropolis, and more.
 - **Tracks 63 biomarkers** across 10 categories with trend charts, reference gauges, and borderline detection.
 - **On-device AI chat** — ask questions about your results, get citation-backed answers grounded in your actual lab values. Full RAG pipeline, entirely offline.
 - **Exports to FHIR R4** — share standardized health data with any FHIR-compatible system.
@@ -240,7 +240,7 @@ Messages are routed through a two-stage classifier — regex prefilter handles e
 <details>
 <summary>Expand</summary>
 
-```
+```text
 lib/
 ├── constants/    # Prompts, templates, budgets, strings
 ├── models/       # 11 ObjectBox entities + data classes
