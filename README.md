@@ -62,6 +62,14 @@ flowchart LR
 ### 1. PDF Import & Parsing
 
 ```mermaid
+flowchart LR
+    A([PDF]) --> B[Text Extract\nor OCR] --> C[4 Regex\nPatterns] --> D[Fuzzy\nMatch] --> E[Flag &\nStore]
+```
+
+<details>
+<summary>Detailed technical diagram</summary>
+
+```mermaid
 flowchart TD
     A([Lab Report PDF]) --> B[PdfTextExtractor\nSyncfusion]
     B --> C{Page has\n≥35 chars?}
@@ -89,7 +97,18 @@ flowchart TD
 
 Each page is extracted digitally first; pages with sparse text fall back to OCR (render → ML Kit → row reconstruction). Raw text runs through 4 regex patterns, and matched rows are fuzzy-matched against 63 biomarker definitions. Values are parsed, reference ranges extracted, and flags computed (including 10% borderline detection).
 
+</details>
+
 ### 2. Insights & Export
+
+```mermaid
+flowchart LR
+    A[(Local DB)] --> B[Dashboard\n& Trends] --> C[Biomarker\nDetail]
+    A --> D[FHIR R4\nExport]
+```
+
+<details>
+<summary>Detailed technical diagram</summary>
 
 ```mermaid
 flowchart TD
@@ -114,7 +133,17 @@ flowchart TD
 
 The dashboard shows a clinical status overview, flags attention-needed biomarkers, and renders per-category trend cards with sparklines. The detail view has interactive trend charts with reference bands and a custom-painted gauge. FHIR export produces a spec-compliant R4 Bundle with LOINC codes, UCUM units, and interpretation codes.
 
+</details>
+
 ### 3. On-Device AI Chat
+
+```mermaid
+flowchart LR
+    A([Message]) --> B[Intent\nRouter] --> C[Build\nContext] --> D[LLM\nStream] --> E[Validate\n& Cite]
+```
+
+<details>
+<summary>Detailed technical diagram</summary>
 
 ```mermaid
 flowchart TD
@@ -145,6 +174,8 @@ flowchart TD
 ```
 
 Messages are routed through a two-stage classifier — regex prefilter handles emergencies, off-topic, and clear intent; ambiguous queries go to an embedding-based centroid classifier. Context is built via semantic search (bge-small-en-v1.5, 384-dim, HNSW) or keyword fallback. The LLM streams a response which is validated for hallucinations, repetition, garbled output, and prohibited diagnostic language. Valid responses get a citation footer mapping `[N]` references back to lab sources.
+
+</details>
 
 > **[Full architecture docs →](https://www.koshika.life)**
 
