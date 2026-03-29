@@ -13,7 +13,7 @@
 
 Koshika turns your PDF lab reports into actionable health insights — parsed, tracked, and explained by AI — entirely on your phone. No cloud. No accounts. No data leaves your device. Ever.
 
-**[Website](https://www.koshika.life)**&ensp;·&ensp;**[Download](#getting-started)**&ensp;·&ensp;**[Contributing](#contributing)**
+**[Website](https://www.koshika.life)**&ensp;·&ensp;**[Contributing](#contributing)**
 
 ---
 
@@ -177,7 +177,6 @@ Messages are routed through a two-stage classifier — regex prefilter handles e
 
 </details>
 
-> **[Full architecture docs →](https://www.koshika.life)**
 
 ---
 
