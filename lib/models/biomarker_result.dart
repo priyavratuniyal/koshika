@@ -61,8 +61,9 @@ class BiomarkerResult {
   @Index()
   DateTime testDate;
 
-  /// Embedding vector for RAG (stored as float list, used with HNSW later)
+  /// Embedding vector for RAG (384-dim from bge-small-en-v1.5).
   @Property(type: PropertyType.floatVector)
+  @HnswIndex(dimensions: 384)
   List<double>? embedding;
 
   BiomarkerResult({

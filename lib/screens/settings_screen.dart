@@ -7,11 +7,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 
+import '../constants/llm_strings.dart';
 import '../main.dart';
 import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 import '../models/models.dart';
-import '../services/embedding_service.dart';
+import '../models/llm_model_config.dart';
 import '../services/fhir_export_service.dart';
+import '../widgets/settings/settings_widgets.dart';
 
 /// Settings screen with AI model management, data controls, and about section.
 class SettingsScreen extends StatefulWidget {
@@ -22,23 +25,35 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late StreamSubscription<ModelInfo> _modelSub;
-  late StreamSubscription<ModelInfo> _embeddingSub;
-  late ModelInfo _modelInfo;
-  late ModelInfo _embeddingInfo;
+  StreamSubscription<ModelInfo>? _modelSub;
+  StreamSubscription<ModelInfo>? _embeddingSub;
+  ModelInfo _modelInfo = const ModelInfo(
+    name: '',
+    downloadUrl: '',
+    estimatedSizeMB: 0,
+  );
+  ModelInfo _embeddingInfo = const ModelInfo(
+    name: '',
+    downloadUrl: '',
+    estimatedSizeMB: 0,
+  );
   String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
-    _modelInfo = gemmaService.currentModelInfo;
-    _embeddingInfo = embeddingService.currentModelInfo;
-    _modelSub = gemmaService.modelStatusStream.listen((info) {
-      if (mounted) setState(() => _modelInfo = info);
-    });
-    _embeddingSub = embeddingService.modelStatusStream.listen((info) {
-      if (mounted) setState(() => _embeddingInfo = info);
-    });
+
+    if (kAiEnabled) {
+      _modelInfo = llmService.currentModelInfo;
+      _embeddingInfo = embeddingService.currentModelInfo;
+      _modelSub = llmService.modelStatusStream.listen((info) {
+        if (mounted) setState(() => _modelInfo = info);
+      });
+      _embeddingSub = embeddingService.modelStatusStream.listen((info) {
+        if (mounted) setState(() => _embeddingInfo = info);
+      });
+    }
+
     _loadAppVersion();
   }
 
@@ -55,39 +70,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
-    _modelSub.cancel();
-    _embeddingSub.cancel();
+    _modelSub?.cancel();
+    _embeddingSub?.cancel();
     super.dispose();
   }
 
-  // ─── Embedding Model ────────────────────────────────────────────────
+  // ─── Model Actions ───────────────────────────────────────────────────
 
-  Future<void> _downloadEmbeddingModel() async {
-    final token = await _getOrPromptHfToken();
-    if (token == null || token.isEmpty) return;
-    await embeddingService.downloadModel(hfToken: token);
-  }
+  Future<void> _onModelSelected(LlmModelConfig config) async {
+    if (config.id == llmService.currentConfig.id && !config.isCustom) return;
 
-  Future<void> _downloadGemmaModel() async {
-    final token = await _getOrPromptHfToken();
-    if (token == null || token.isEmpty) return;
-    await gemmaService.downloadModel(hfToken: token);
-  }
-
-  Future<String?> _getOrPromptHfToken() async {
-    var token = await EmbeddingService.getHfToken();
-
-    if (token == null || token.isEmpty) {
-      if (!mounted) return null;
-      token = await showDialog<String>(
+    // Warn if switching away from a downloaded model
+    if (_modelInfo.status != ModelStatus.notDownloaded) {
+      final confirmed = await showDialog<bool>(
         context: context,
-        builder: (ctx) => _HfTokenDialog(),
+        builder: (ctx) => AlertDialog(
+          title: const Text('Switch Model?'),
+          content: Text(
+            'Switching will remove ${_modelInfo.name} '
+            '(~${_modelInfo.formattedSize}) from this device. '
+            'The new model will need to be downloaded.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Switch'),
+            ),
+          ],
+        ),
       );
-      if (token == null || token.isEmpty) return null;
-      await EmbeddingService.saveHfToken(token);
+      if (confirmed != true || !mounted) return;
     }
 
-    return token;
+    await llmService.switchModel(config);
+  }
+
+  Future<void> _onCustomModelTap() async {
+    if (!mounted) return;
+    final result = await showDialog<LlmModelConfig>(
+      context: context,
+      builder: (ctx) => const CustomModelDialog(),
+    );
+    if (result != null) await _onModelSelected(result);
+  }
+
+  Future<void> _loadEmbeddingModel() async {
+    await embeddingService.loadModel();
+    await migrateEmbeddingsIfNeeded();
   }
 
   // ─── Data Actions ───────────────────────────────────────────────────
@@ -142,9 +175,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to delete data: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete data. Please try again.'),
+          ),
+        );
       }
     }
   }
@@ -204,582 +239,133 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: KoshikaSpacing.base),
         children: [
-          // ── AI Model Section ──
-          _SectionHeader(title: 'AI Models', icon: Icons.smart_toy_outlined),
-          _ModelStatusTile(
-            modelInfo: _modelInfo,
-            onDownload: _downloadGemmaModel,
-            onLoad: () => gemmaService.loadModel(),
-            onUnload: () => gemmaService.unloadModel(),
-          ),
-          _EmbeddingModelTile(
-            modelInfo: _embeddingInfo,
-            onDownload: _downloadEmbeddingModel,
-            onLoad: () => embeddingService.loadModel(),
-            onUnload: () => embeddingService.unloadModel(),
-          ),
-
-          const Divider(height: 1),
+          // ── AI Model Section (full flavor only) ──
+          if (kAiEnabled) ...[
+            SettingsSectionHeader(
+              title: 'AI Models',
+              icon: Icons.smart_toy_outlined,
+            ),
+            ModelPickerSection(
+              modelInfo: _modelInfo,
+              currentConfig: llmService.currentConfig,
+              onModelSelected: _onModelSelected,
+              onCustomModelTap: _onCustomModelTap,
+              onDownload: () => llmService.downloadModel(),
+              onLoad: () => llmService.loadModel(),
+              onUnload: () => llmService.unloadModel(),
+              onCancelDownload: () => llmService.cancelDownload(),
+            ),
+            const SizedBox(height: KoshikaSpacing.sm),
+            EmbeddingModelTile(
+              modelInfo: _embeddingInfo,
+              onDownload: () => embeddingService.downloadModel(),
+              onLoad: _loadEmbeddingModel,
+              onUnload: () => embeddingService.unloadModel(),
+            ),
+            const SizedBox(height: KoshikaSpacing.md),
+            SettingsSectionHeader(
+              title: LlmStrings.hfTokenSectionTitle,
+              icon: Icons.key_outlined,
+            ),
+            const HfTokenTile(),
+            const SizedBox(height: KoshikaSpacing.sm),
+          ],
 
           // ── Data Section ──
-          _SectionHeader(
+          SettingsSectionHeader(
             title: 'Data Management',
             icon: Icons.storage_outlined,
           ),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Reports imported'),
+          SettingsRow(
+            icon: Icons.description_outlined,
+            iconColor: AppColors.primary,
+            title: 'Reports imported',
             trailing: Text(
               '${reports.length}',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
+              style: KoshikaTypography.statusText.copyWith(
+                color: AppColors.primary,
               ),
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.biotech_outlined),
-            title: const Text('Biomarkers tracked'),
+          SettingsRow(
+            icon: Icons.biotech_outlined,
+            iconColor: AppColors.primary,
+            title: 'Biomarkers tracked',
             trailing: Text(
               '$biomarkerCount',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
+              style: KoshikaTypography.statusText.copyWith(
+                color: AppColors.primary,
               ),
             ),
           ),
-          ListTile(
-            leading: Icon(Icons.ios_share, color: theme.colorScheme.primary),
-            title: const Text('Export All Data (FHIR R4)'),
-            subtitle: const Text('Share as interoperable health bundle'),
+          SettingsRow(
+            icon: Icons.ios_share,
+            iconColor: AppColors.primary,
+            title: 'Export All Data (FHIR R4)',
+            subtitle: 'Share as interoperable health bundle',
             onTap: _exportAllFhir,
           ),
-          ListTile(
-            leading: Icon(Icons.delete_forever, color: theme.colorScheme.error),
-            title: Text(
-              'Delete All Data',
-              style: TextStyle(color: theme.colorScheme.error),
-            ),
-            subtitle: const Text('Remove all reports and biomarkers'),
+          SettingsRow(
+            icon: Icons.delete_forever,
+            iconColor: AppColors.error,
+            title: 'Delete All Data',
+            titleColor: AppColors.error,
+            subtitle: 'Remove all reports and biomarkers',
             onTap: _deleteAllData,
           ),
 
-          const Divider(height: 1),
+          const SizedBox(height: KoshikaSpacing.sm),
 
           // ── About Section ──
-          _SectionHeader(title: 'About', icon: Icons.info_outline),
-          ListTile(
-            leading: const Icon(Icons.local_hospital),
-            title: const Text('Koshika — कोशिका'),
-            subtitle: const Text(
-              'Offline-first health data tracker with on-device AI',
-            ),
+          SettingsSectionHeader(title: 'About', icon: Icons.info_outline),
+          SettingsRow(
+            icon: Icons.local_hospital,
+            iconColor: AppColors.primary,
+            title: 'Koshika',
+            subtitle: 'Offline-first health data tracker with on-device AI',
           ),
-          ListTile(
-            leading: const Icon(Icons.tag),
-            title: const Text('Version'),
+          SettingsRow(
+            icon: Icons.tag,
+            iconColor: AppColors.onSurfaceVariant,
+            title: 'Version',
             trailing: Text(
               _appVersion.isEmpty ? '...' : _appVersion,
-              style: theme.textTheme.bodyMedium,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.code),
-            title: const Text('Source Code'),
-            subtitle: const Text('github.com/priyavratuniyal/koshika'),
+          SettingsRow(
+            icon: Icons.code,
+            iconColor: AppColors.onSurfaceVariant,
+            title: 'Source Code',
+            subtitle: 'github.com/priyavratuniyal/koshika',
           ),
-          ListTile(
-            leading: const Icon(Icons.balance),
-            title: const Text('License'),
-            trailing: Text('Apache 2.0', style: theme.textTheme.bodyMedium),
+          SettingsRow(
+            icon: Icons.balance,
+            iconColor: AppColors.onSurfaceVariant,
+            title: 'License',
+            trailing: Text(
+              'Apache 2.0',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
           ),
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(KoshikaSpacing.xl),
             child: Text(
-              'Built for FOSS Hack 2026 🇮🇳',
+              'Built for FOSS Hack 2026',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                color: AppColors.textMuted,
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Section Header
-// ═══════════════════════════════════════════════════════════════════════
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final IconData icon;
-
-  const _SectionHeader({required this.title, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Text(
-            title.toUpperCase(),
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Model Status Tile
-// ═══════════════════════════════════════════════════════════════════════
-
-class _ModelStatusTile extends StatelessWidget {
-  final ModelInfo modelInfo;
-  final VoidCallback onDownload;
-  final VoidCallback onLoad;
-  final VoidCallback onUnload;
-
-  const _ModelStatusTile({
-    required this.modelInfo,
-    required this.onDownload,
-    required this.onLoad,
-    required this.onUnload,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(_statusIcon, color: _statusColor(theme), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      modelInfo.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusColor(theme).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _statusLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: _statusColor(theme),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Size: ${modelInfo.formattedSize}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-              if (modelInfo.status == ModelStatus.downloading) ...[
-                const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: modelInfo.downloadProgress / 100,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${modelInfo.downloadProgress}%',
-                  style: theme.textTheme.labelSmall,
-                ),
-              ],
-              if (modelInfo.errorMessage != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  modelInfo.errorMessage!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (modelInfo.canDownload)
-                    FilledButton.icon(
-                      onPressed: onDownload,
-                      icon: const Icon(Icons.download, size: 18),
-                      label: const Text('Download'),
-                    ),
-                  if (modelInfo.canLoad)
-                    FilledButton.tonal(
-                      onPressed: onLoad,
-                      child: const Text('Load Model'),
-                    ),
-                  if (modelInfo.isUsable)
-                    OutlinedButton(
-                      onPressed: onUnload,
-                      child: const Text('Unload'),
-                    ),
-                  if (modelInfo.status == ModelStatus.downloading ||
-                      modelInfo.status == ModelStatus.loading)
-                    const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  IconData get _statusIcon {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return Icons.cloud_download_outlined;
-      case ModelStatus.downloading:
-        return Icons.downloading;
-      case ModelStatus.ready:
-        return Icons.check_circle_outline;
-      case ModelStatus.loading:
-        return Icons.hourglass_top;
-      case ModelStatus.loaded:
-        return Icons.check_circle;
-      case ModelStatus.error:
-        return Icons.error_outline;
-    }
-  }
-
-  String get _statusLabel {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return 'Not Downloaded';
-      case ModelStatus.downloading:
-        return 'Downloading...';
-      case ModelStatus.ready:
-        return 'Ready';
-      case ModelStatus.loading:
-        return 'Loading...';
-      case ModelStatus.loaded:
-        return 'Active';
-      case ModelStatus.error:
-        return 'Error';
-    }
-  }
-
-  Color _statusColor(ThemeData theme) {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return AppColors.onSurfaceVariant;
-      case ModelStatus.downloading:
-      case ModelStatus.loading:
-        return AppColors.statusBusy;
-      case ModelStatus.ready:
-        return AppColors.statusReady;
-      case ModelStatus.loaded:
-        return AppColors.statusActive;
-      case ModelStatus.error:
-        return AppColors.error;
-    }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Embedding Model Status Tile
-// ═══════════════════════════════════════════════════════════════════════
-
-class _EmbeddingModelTile extends StatelessWidget {
-  final ModelInfo modelInfo;
-  final VoidCallback onDownload;
-  final VoidCallback onLoad;
-  final VoidCallback onUnload;
-
-  const _EmbeddingModelTile({
-    required this.modelInfo,
-    required this.onDownload,
-    required this.onLoad,
-    required this.onUnload,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(_statusIcon, color: _statusColor(theme), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          modelInfo.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Enables semantic search for AI chat',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _statusColor(theme).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _statusLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: _statusColor(theme),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Size: ${modelInfo.formattedSize}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-              if (modelInfo.status == ModelStatus.downloading) ...[
-                const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: modelInfo.downloadProgress / 100,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${modelInfo.downloadProgress}%',
-                  style: theme.textTheme.labelSmall,
-                ),
-              ],
-              if (modelInfo.errorMessage != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  modelInfo.errorMessage!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (modelInfo.canDownload)
-                    FilledButton.icon(
-                      onPressed: onDownload,
-                      icon: const Icon(Icons.download, size: 18),
-                      label: const Text('Download'),
-                    ),
-                  if (modelInfo.canLoad)
-                    FilledButton.tonal(
-                      onPressed: onLoad,
-                      child: const Text('Load'),
-                    ),
-                  if (modelInfo.isUsable)
-                    OutlinedButton(
-                      onPressed: onUnload,
-                      child: const Text('Unload'),
-                    ),
-                  if (modelInfo.status == ModelStatus.downloading ||
-                      modelInfo.status == ModelStatus.loading)
-                    const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  IconData get _statusIcon {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return Icons.cloud_download_outlined;
-      case ModelStatus.downloading:
-        return Icons.downloading;
-      case ModelStatus.ready:
-        return Icons.check_circle_outline;
-      case ModelStatus.loading:
-        return Icons.hourglass_top;
-      case ModelStatus.loaded:
-        return Icons.check_circle;
-      case ModelStatus.error:
-        return Icons.error_outline;
-    }
-  }
-
-  String get _statusLabel {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return 'Not Downloaded';
-      case ModelStatus.downloading:
-        return 'Downloading...';
-      case ModelStatus.ready:
-        return 'Ready';
-      case ModelStatus.loading:
-        return 'Loading...';
-      case ModelStatus.loaded:
-        return 'Active';
-      case ModelStatus.error:
-        return 'Error';
-    }
-  }
-
-  Color _statusColor(ThemeData theme) {
-    switch (modelInfo.status) {
-      case ModelStatus.notDownloaded:
-        return AppColors.onSurfaceVariant;
-      case ModelStatus.downloading:
-      case ModelStatus.loading:
-        return AppColors.statusBusy;
-      case ModelStatus.ready:
-        return AppColors.statusReady;
-      case ModelStatus.loaded:
-        return AppColors.statusActive;
-      case ModelStatus.error:
-        return AppColors.error;
-    }
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// HuggingFace Token Dialog
-// ═══════════════════════════════════════════════════════════════════════
-
-class _HfTokenDialog extends StatefulWidget {
-  @override
-  State<_HfTokenDialog> createState() => _HfTokenDialogState();
-}
-
-class _HfTokenDialogState extends State<_HfTokenDialog> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('HuggingFace Token'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Koshika downloads gated Hugging Face models, so you need a token '
-            'with access to both repos:',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '1. Create a free account at huggingface.co\n'
-            '2. Request/accept access for:\n'
-            '   - litert-community/embeddinggemma-300m\n'
-            '   - litert-community/Gemma3-1B-IT\n'
-            '3. Create a Read token in Settings > Access Tokens\n'
-            '4. Paste that token here',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            decoration: const InputDecoration(
-              labelText: 'Access Token',
-              hintText: 'hf_...',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            obscureText: true,
-            autocorrect: false,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final token = _controller.text.trim();
-            if (token.isNotEmpty) {
-              Navigator.of(context).pop(token);
-            }
-          },
-          child: const Text('Download'),
-        ),
-      ],
     );
   }
 }

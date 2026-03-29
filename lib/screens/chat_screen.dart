@@ -1,15 +1,24 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import 'package:flutter_gemma/flutter_gemma.dart';
-
 import '../main.dart';
 import '../models/models.dart';
+import '../models/retrieval_result.dart';
+import '../constants/ai_prompts.dart';
+import '../constants/llm_strings.dart';
+import '../constants/token_budgets.dart';
+import '../constants/validation_strings.dart';
+import '../models/query_decision.dart';
 import '../services/chat_context_builder.dart';
 import '../services/citation_extractor.dart';
-import '../services/embedding_service.dart';
+import '../services/intent_classifier.dart';
+import '../services/llm_service.dart';
+import '../services/output_validator.dart';
+import '../services/query_router.dart';
 import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 import '../widgets/chat_message_bubble.dart';
 
 /// The AI Chat screen — transforms from download/load prompt into a
@@ -36,24 +45,38 @@ class _ChatScreenState extends State<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   late final ChatContextBuilder _contextBuilder;
+  late final QueryRouter _queryRouter;
+  IntentClassifier? _intentClassifier;
   ChatSession? _currentSession;
   bool _hasShownPersistenceWarning = false;
   bool _hasLoggedUnknownRoleIndex = false;
 
   StreamSubscription<ModelInfo>? _statusSubscription;
   StreamSubscription<String>? _generationSubscription;
-  ModelInfo _modelInfo = gemmaService.currentModelInfo;
+  ModelInfo _modelInfo = llmService.currentModelInfo;
 
   @override
   void initState() {
     super.initState();
     _contextBuilder = ChatContextBuilder(vectorStore: vectorStoreService);
-    _loadMostRecentSession();
-    _statusSubscription = gemmaService.modelStatusStream.listen((info) {
+    _initIntentClassifier();
+    _queryRouter = QueryRouter(classifierGetter: () => _intentClassifier);
+    _statusSubscription = llmService.modelStatusStream.listen((info) {
       if (mounted) {
         setState(() => _modelInfo = info);
       }
     });
+    // Auto-load model if already downloaded
+    if (_modelInfo.status == ModelStatus.ready) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadModel());
+    }
+  }
+
+  void _initIntentClassifier() {
+    if (!embeddingService.isLoaded) return;
+    _intentClassifier = IntentClassifier(embeddingService);
+    // Initialize centroids in the background — non-blocking
+    _intentClassifier!.initialize();
   }
 
   @override
@@ -63,31 +86,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _loadMostRecentSession() {
-    try {
-      final sessions = objectbox.getAllSessions();
-      if (sessions.isEmpty) return;
-
-      final session = sessions.first;
-      final persisted = objectbox.getMessagesForSession(session.id);
-      _currentSession = session;
-      _messages.addAll(
-        persisted.map(
-          (m) => ChatMessage(
-            id: 'db-${m.id}',
-            content: m.content,
-            role: _roleFromIndex(m.roleIndex),
-            timestamp: m.timestamp,
-            isStreaming: false,
-            isError: m.isError,
-          ),
-        ),
-      );
-    } catch (e, st) {
-      _logStorageError('load most recent session', e, st);
-    }
   }
 
   ChatRole _roleFromIndex(int index) {
@@ -129,9 +127,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!mounted || _hasShownPersistenceWarning) return;
     _hasShownPersistenceWarning = true;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Could not save chat history for one or more messages.'),
-      ),
+      const SnackBar(content: Text(LlmStrings.persistenceWarning)),
     );
   }
 
@@ -180,7 +176,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   onTap: () =>
                       Navigator.of(context).pop(_SessionSheetAction.newChat),
                 ),
-                const Divider(height: 1),
+                const SizedBox(height: KoshikaSpacing.xs),
                 Expanded(
                   child: sessions.isEmpty
                       ? const Center(child: Text('No previous conversations'))
@@ -236,7 +232,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadSession(ChatSession session) async {
     _generationSubscription?.cancel();
     _generationSubscription = null;
-    await gemmaService.stopGeneration();
+    await llmService.stopGeneration();
 
     List<PersistedChatMessage> persisted;
     try {
@@ -269,10 +265,53 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // ─── Chat Logic ────────────────────────────────────────────────────
 
+  /// Extract up to 2 prior turns (1 user + 1 assistant) from the current
+  /// message list for conversation history injection.
+  ///
+  /// Returns null if there are fewer than 2 prior messages.
+  /// History content is truncated to [TokenBudgets.maxHistoryChars] to
+  /// stay within the context budget.
+  List<ChatHistoryTurn>? _buildConversationHistory() {
+    // Need at least 2 prior messages (user + assistant) before the current one
+    // The current user message is already added, so look at messages before it
+    if (_messages.length < 3) return null;
+
+    final history = <ChatHistoryTurn>[];
+    // Walk backwards from the message before the current user message
+    // (which is the last message in the list)
+    final startIndex = _messages.length - 2; // skip current user message
+    int charsUsed = 0;
+
+    for (int i = startIndex; i >= 0 && history.length < 2; i--) {
+      final msg = _messages[i];
+      if (msg.isError || msg.isStreaming) continue;
+      if (msg.role != ChatRole.user && msg.role != ChatRole.assistant) continue;
+
+      final content = msg.content;
+      if (charsUsed + content.length > TokenBudgets.maxHistoryChars) break;
+
+      history.insert(
+        0,
+        ChatHistoryTurn(content: content, isUser: msg.role == ChatRole.user),
+      );
+      charsUsed += content.length;
+    }
+
+    return history.isEmpty ? null : history;
+  }
+
+  /// Display a pre-built response without invoking the LLM.
+  void _addDeterministicResponse(String content, {ChatSession? session}) {
+    final msg = ChatMessage(content: content, role: ChatRole.assistant);
+    setState(() => _messages.add(msg));
+    if (session != null) _persistMessage(session, msg);
+    _scrollToBottom();
+  }
+
   Future<void> _sendMessage([String? overrideText]) async {
     final text = (overrideText ?? _textController.text).trim();
     if (text.isEmpty || !mounted) return;
-    if (gemmaService.isGenerating) return;
+    if (llmService.isGenerating) return;
 
     _textController.clear();
     final activeSession = _ensureCurrentSession(text);
@@ -287,11 +326,56 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _scrollToBottom();
 
-    // Build context from lab data (async — may use semantic search)
-    final context = await _contextBuilder.buildQueryContext(text);
-    final retrievedDocs = List<RetrievalResult>.from(
-      _contextBuilder.lastRetrievedDocs,
+    // Collect conversation history before routing — used for both
+    // history-aware routing and prompt injection.
+    final history = _buildConversationHistory();
+
+    // Route the query — may short-circuit with a deterministic response.
+    // Lab-data lookup is separated from routing so that an ObjectBox error
+    // doesn't bypass safety-critical emergency/off-topic detection.
+    var hasLabData = false;
+    try {
+      hasLabData = objectbox.getLatestResults().isNotEmpty;
+    } catch (e) {
+      debugPrint(
+        'Lab data lookup failed; assuming no lab data for routing: $e',
+      );
+    }
+
+    final routeResult = await _queryRouter.route(
+      text,
+      hasLabData: hasLabData,
+      conversationHistory: history,
     );
+
+    if (!routeResult.requiresLlm) {
+      if (mounted) {
+        _addDeterministicResponse(
+          routeResult.deterministicResponse!,
+          session: activeSession,
+        );
+      }
+      return;
+    }
+
+    // Select system prompt and context strategy based on routing decision
+    final isGeneralHealth =
+        routeResult.decision == QueryDecision.answerGeneralHealth;
+    final promptOverride = isGeneralHealth
+        ? AiPrompts.generalHealthPrompt
+        : null;
+
+    // Only build lab context for queries that need it — skip semantic search
+    // for general health education to avoid contradictory prompt/context
+    // signals and save computation.
+    String? context;
+    var retrievedDocs = <RetrievalResult>[];
+    if (!isGeneralHealth) {
+      context = await _contextBuilder.buildQueryContext(text);
+      retrievedDocs = List<RetrievalResult>.from(
+        _contextBuilder.lastRetrievedDocs,
+      );
+    }
 
     if (!mounted) return;
 
@@ -302,21 +386,49 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    // Start streaming generation
-    final assistantIndex = _messages.length - 1;
+    _startGeneration(
+      query: text,
+      context: context,
+      promptOverride: promptOverride,
+      history: history,
+      retrievedDocs: retrievedDocs,
+      activeSession: activeSession,
+      assistantIndex: _messages.length - 1,
+    );
+  }
+
+  /// Start streaming generation with retry support.
+  ///
+  /// On empty output or generation error, retries up to
+  /// [TokenBudgets.maxGenerationRetries] times before showing a fallback.
+  void _startGeneration({
+    required String query,
+    required String? context,
+    required String? promptOverride,
+    required List<ChatHistoryTurn>? history,
+    required List<RetrievalResult> retrievedDocs,
+    required ChatSession? activeSession,
+    required int assistantIndex,
+    int attempt = 0,
+  }) {
     final tokenBuffer = StringBuffer();
-    var assistantPersistAttempted = false;
+    var persistAttempted = false;
 
     void persistAssistantOnce() {
       final session = activeSession;
-      if (session == null || assistantPersistAttempted) return;
-      assistantPersistAttempted = true;
+      if (session == null || persistAttempted) return;
+      persistAttempted = true;
       _persistMessage(session, _messages[assistantIndex]);
     }
 
     _generationSubscription?.cancel();
-    _generationSubscription = gemmaService
-        .generateResponse(text, context: context)
+    _generationSubscription = llmService
+        .generateResponse(
+          query,
+          context: context,
+          systemPromptOverride: promptOverride,
+          conversationHistory: history,
+        )
         .listen(
           (token) {
             tokenBuffer.write(token);
@@ -331,36 +443,99 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           },
           onDone: () {
-            if (mounted) {
-              var finalContent = tokenBuffer.toString();
-              // Append citation footer if we have retrieved docs
-              if (finalContent.isNotEmpty && retrievedDocs.isNotEmpty) {
-                finalContent = CitationExtractor.appendSourceFooter(
-                  finalContent,
-                  retrievedDocs,
-                );
-              }
+            if (!mounted) return;
+            var finalContent = tokenBuffer.toString();
+
+            // Validate output before showing to user
+            final validation = OutputValidator.validate(
+              finalContent,
+              labContext: context,
+            );
+
+            // Retry on empty or garbled output (up to max retries)
+            final isRetriable =
+                validation == ValidationResult.empty ||
+                validation == ValidationResult.garbled;
+            if (isRetriable && attempt < TokenBudgets.maxGenerationRetries) {
+              debugPrint(LlmStrings.retryingGenerationLog);
+              // Reset the placeholder for the next attempt
               setState(() {
                 _messages[assistantIndex] = _messages[assistantIndex].copyWith(
-                  isStreaming: false,
-                  content: finalContent.isEmpty
-                      ? 'I wasn\'t able to generate a response. Please try again.'
-                      : finalContent,
+                  content: '',
+                  isStreaming: true,
                 );
               });
-              persistAssistantOnce();
-              _scrollToBottom();
+              _startGeneration(
+                query: query,
+                context: context,
+                promptOverride: promptOverride,
+                history: history,
+                retrievedDocs: retrievedDocs,
+                activeSession: activeSession,
+                assistantIndex: assistantIndex,
+                attempt: attempt + 1,
+              );
+              return;
             }
+
+            if (validation != ValidationResult.passed) {
+              finalContent = OutputValidator.applyFallback(
+                validation,
+                finalContent,
+              );
+            }
+
+            // Append citation footer if we have retrieved docs
+            if (finalContent.isNotEmpty &&
+                retrievedDocs.isNotEmpty &&
+                validation == ValidationResult.passed) {
+              finalContent = CitationExtractor.appendSourceFooter(
+                finalContent,
+                retrievedDocs,
+              );
+            }
+            setState(() {
+              _messages[assistantIndex] = _messages[assistantIndex].copyWith(
+                isStreaming: false,
+                content: finalContent.isEmpty
+                    ? ValidationStrings.genericFallback
+                    : finalContent,
+              );
+            });
+            persistAssistantOnce();
+            _scrollToBottom();
           },
           onError: (e) {
-            if (mounted) {
+            if (!mounted) return;
+
+            // Retry once on error before showing error message
+            if (attempt < TokenBudgets.maxGenerationRetries) {
+              debugPrint(LlmStrings.retryingGenerationLog);
               setState(() {
-                _messages[assistantIndex] = ChatMessage.error(
-                  'An error occurred during generation: $e',
+                _messages[assistantIndex] = _messages[assistantIndex].copyWith(
+                  content: '',
+                  isStreaming: true,
                 );
               });
-              persistAssistantOnce();
+              _startGeneration(
+                query: query,
+                context: context,
+                promptOverride: promptOverride,
+                history: history,
+                retrievedDocs: retrievedDocs,
+                activeSession: activeSession,
+                assistantIndex: assistantIndex,
+                attempt: attempt + 1,
+              );
+              return;
             }
+
+            setState(() {
+              _messages[assistantIndex] = ChatMessage.error(
+                '${LlmStrings.errorDuringGeneration}$e',
+              );
+            });
+            persistAssistantOnce();
           },
         );
   }
@@ -368,7 +543,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _stopGeneration() async {
     _generationSubscription?.cancel();
     _generationSubscription = null;
-    await gemmaService.stopGeneration();
+    await llmService.stopGeneration();
 
     // Finalize the last message
     if (mounted && _messages.isNotEmpty && _messages.last.isStreaming) {
@@ -377,8 +552,8 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages[_messages.length - 1] = last.copyWith(
           isStreaming: false,
           content: last.content.isEmpty
-              ? '[Generation stopped]'
-              : '${last.content}\n\n[Generation stopped]',
+              ? LlmStrings.generationStopped
+              : '${last.content}\n\n${LlmStrings.generationStopped}',
         );
       });
       final session = _currentSession;
@@ -391,7 +566,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _startNewChat() {
     _generationSubscription?.cancel();
     _generationSubscription = null;
-    gemmaService.stopGeneration();
+    llmService.stopGeneration();
     setState(() {
       _currentSession = null;
       _messages.clear();
@@ -413,91 +588,27 @@ class _ChatScreenState extends State<ChatScreen> {
   // ─── Model Actions ─────────────────────────────────────────────────
 
   Future<void> _downloadModel() async {
-    final token = await _getOrPromptHfToken();
-    if (token == null || token.isEmpty) return;
-    await gemmaService.downloadModel(hfToken: token);
+    await llmService.downloadModel();
   }
 
   void _cancelDownload() {
-    gemmaService.cancelDownload();
+    llmService.cancelDownload();
   }
 
   Future<void> _loadModel() async {
-    await gemmaService.loadModel();
+    await llmService.loadModel();
   }
 
   Future<void> _unloadModel() async {
-    await gemmaService.unloadModel();
+    await llmService.unloadModel();
   }
 
   Future<void> _retryFromError() async {
-    // Determine what to retry based on current state history
     if (_modelInfo.canDownload) {
       await _downloadModel();
     } else if (_modelInfo.canLoad) {
       await _loadModel();
     }
-  }
-
-  Future<String?> _getOrPromptHfToken() async {
-    var token = await EmbeddingService.getHfToken();
-    if (token != null && token.isNotEmpty) return token;
-    if (!mounted) return null;
-
-    final controller = TextEditingController();
-    token = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hugging Face Token'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'The chat model is gated on Hugging Face and needs a token with '
-              'read access.',
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Grant access to litert-community/Gemma3-1B-IT, create a Read '
-              'token, then paste it here.',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Access Token',
-                hintText: 'hf_...',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              obscureText: true,
-              autocorrect: false,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              if (value.isNotEmpty) {
-                Navigator.of(context).pop(value);
-              }
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-
-    if (token == null || token.isEmpty) return null;
-    await EmbeddingService.saveHfToken(token);
-    return token;
   }
 
   // ─── Build ─────────────────────────────────────────────────────────
@@ -509,7 +620,7 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Text(_currentSession?.title ?? 'AI Chat'),
         actions: [
           IconButton(
-            onPressed: gemmaService.isGenerating ? null : _openSessionSheet,
+            onPressed: llmService.isGenerating ? null : _openSessionSheet,
             tooltip: 'Conversations',
             icon: const Icon(Icons.history),
           ),
@@ -574,7 +685,7 @@ class _ChatScreenState extends State<ChatScreen> {
           messages: _messages,
           textController: _textController,
           scrollController: _scrollController,
-          isGenerating: gemmaService.isGenerating,
+          isGenerating: llmService.isGenerating,
           isSemanticSearchActive: _contextBuilder.isSemanticSearchActive,
           onSend: _sendMessage,
           onStop: _stopGeneration,
@@ -605,7 +716,7 @@ class _NotDownloadedView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -622,15 +733,14 @@ class _NotDownloadedView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             Text(
               'AI Assistant',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             Text(
               'Download the ${modelInfo.name} model to chat about your health data privately on this device.',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -638,13 +748,15 @@ class _NotDownloadedView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: KoshikaSpacing.base,
+                vertical: KoshikaSpacing.md,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.outlineVariant),
+                borderRadius: KoshikaRadius.lg,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -654,20 +766,20 @@ class _NotDownloadedView extends StatelessWidget {
                     size: 16,
                     color: AppColors.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: KoshikaSpacing.sm),
                   Text(
                     'Download size: ~${modelInfo.formattedSize}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: KoshikaSpacing.base),
                   const Icon(
                     Icons.wifi,
                     size: 16,
                     color: AppColors.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: KoshikaSpacing.xs),
                   Text(
                     'Wi-Fi recommended',
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -677,10 +789,9 @@ class _NotDownloadedView extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             FilledButton.icon(
               onPressed: onDownload,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               icon: const Icon(Icons.download),
               label: const Text('Download AI Model'),
             ),
@@ -708,7 +819,7 @@ class _DownloadingView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -725,21 +836,21 @@ class _DownloadingView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             Text(
               'Downloading ${modelInfo.name}',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
+                fontSize: 20,
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             SizedBox(
               width: 280,
               child: Column(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: KoshikaRadius.md,
                     child: LinearProgressIndicator(
                       value: progress > 0 ? progress / 100.0 : null,
                       minHeight: 8,
@@ -749,7 +860,7 @@ class _DownloadingView extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: KoshikaSpacing.sm),
                   Text(
                     progress > 0
                         ? '$progress% downloaded'
@@ -761,20 +872,16 @@ class _DownloadingView extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             Text(
               'Please keep the app open',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             OutlinedButton.icon(
               onPressed: onCancel,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.outlineVariant),
-              ),
               icon: const Icon(Icons.close, size: 18),
               label: const Text('Cancel'),
             ),
@@ -800,7 +907,7 @@ class _ReadyView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -817,15 +924,14 @@ class _ReadyView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             Text(
               'AI Model Ready',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             Text(
               'The model is downloaded. Load it into memory to start chatting about your health data.',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -833,10 +939,9 @@ class _ReadyView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             FilledButton.icon(
               onPressed: onLoad,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text('Load Model'),
             ),
@@ -860,7 +965,7 @@ class _LoadingView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -872,15 +977,15 @@ class _LoadingView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             Text(
               'Loading AI Model...',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
+                fontSize: 20,
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             Text(
               'This may take a few seconds depending on your device.',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -929,7 +1034,10 @@ class _ChatView extends StatelessWidget {
         // Search mode indicator
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: KoshikaSpacing.base,
+            vertical: 6,
+          ),
           color: isSemanticSearchActive
               ? AppColors.primaryContainer.withValues(alpha: 0.12)
               : AppColors.surfaceContainerHigh.withValues(alpha: 0.6),
@@ -944,7 +1052,7 @@ class _ChatView extends StatelessWidget {
                     ? AppColors.primary
                     : AppColors.onSurfaceVariant.withValues(alpha: 0.6),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: KoshikaSpacing.xs),
               Text(
                 isSemanticSearchActive
                     ? 'Semantic search active'
@@ -966,8 +1074,8 @@ class _ChatView extends StatelessWidget {
               : ListView.builder(
                   controller: scrollController,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                    horizontal: KoshikaSpacing.base,
+                    vertical: KoshikaSpacing.sm,
                   ),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
@@ -976,84 +1084,120 @@ class _ChatView extends StatelessWidget {
                 ),
         ),
 
-        // Input bar
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onSurface.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
+        // Glassmorphic input bar
+        ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.85),
               ),
-            ],
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-          child: SafeArea(
-            top: false,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Text input
-                Expanded(
-                  child: TextField(
-                    controller: textController,
-                    maxLines: 5,
-                    minLines: 1,
-                    enabled: !isGenerating,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: InputDecoration(
-                      hintText: 'Ask about your health data...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.surfaceContainerLow,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                    onSubmitted: (_) => onSend(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // Send / Stop button
-                if (isGenerating)
-                  IconButton.filledTonal(
-                    onPressed: onStop,
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.primaryContainer.withValues(
-                        alpha: 0.2,
-                      ),
-                      foregroundColor: AppColors.primary,
-                    ),
-                    icon: const Icon(Icons.stop_rounded),
-                    tooltip: 'Stop generation',
-                  )
-                else
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: textController,
-                    builder: (context, value, _) {
-                      final hasText = value.text.trim().isNotEmpty;
-                      return IconButton.filled(
-                        onPressed: hasText ? onSend : null,
-                        style: IconButton.styleFrom(
-                          backgroundColor: hasText
-                              ? AppColors.primary
-                              : AppColors.surfaceContainerHigh,
-                          foregroundColor: hasText
-                              ? Colors.white
-                              : AppColors.onSurfaceVariant,
+              padding: const EdgeInsets.fromLTRB(
+                KoshikaSpacing.base,
+                KoshikaSpacing.sm,
+                KoshikaSpacing.sm,
+                KoshikaSpacing.xs,
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Text input
+                        Expanded(
+                          child: TextField(
+                            controller: textController,
+                            maxLines: 5,
+                            minLines: 1,
+                            enabled: !isGenerating,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: InputDecoration(
+                              hintText: 'Ask about your health data...',
+                              border: OutlineInputBorder(
+                                borderRadius: KoshikaRadius.xxl,
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.surfaceContainerLow,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: KoshikaSpacing.lg,
+                                vertical: KoshikaSpacing.md,
+                              ),
+                            ),
+                            onSubmitted: (_) => onSend(),
+                          ),
                         ),
-                        icon: const Icon(Icons.send_rounded),
-                        tooltip: 'Send message',
-                      );
-                    },
-                  ),
-              ],
+                        const SizedBox(width: KoshikaSpacing.sm),
+
+                        // Send / Stop button
+                        if (isGenerating)
+                          IconButton.filledTonal(
+                            onPressed: onStop,
+                            style: IconButton.styleFrom(
+                              backgroundColor: AppColors.primaryContainer
+                                  .withValues(alpha: 0.2),
+                              foregroundColor: AppColors.primary,
+                            ),
+                            icon: const Icon(Icons.stop_rounded),
+                            tooltip: 'Stop generation',
+                          )
+                        else
+                          ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: textController,
+                            builder: (context, value, _) {
+                              final hasText = value.text.trim().isNotEmpty;
+                              return IconButton.filled(
+                                onPressed: hasText ? onSend : null,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: hasText
+                                      ? AppColors.primary
+                                      : AppColors.surfaceContainerHigh,
+                                  foregroundColor: hasText
+                                      ? Colors.white
+                                      : AppColors.onSurfaceVariant,
+                                ),
+                                icon: const Icon(Icons.send_rounded),
+                                tooltip: 'Send message',
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                    // Privacy label
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        top: KoshikaSpacing.xs,
+                        bottom: KoshikaSpacing.xs,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.lock_outline,
+                            size: 11,
+                            color: AppColors.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            'All processing happens on your device',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.onSurfaceVariant.withValues(
+                                alpha: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -1077,7 +1221,7 @@ class _EmptyChatView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1094,15 +1238,15 @@ class _EmptyChatView extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             Text(
               'Ask about your health data',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
+                fontSize: 18,
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             Text(
               'Your lab data is automatically included as context. '
               'Try asking:',
@@ -1111,38 +1255,20 @@ class _EmptyChatView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             _SuggestionChip(
               label: 'How is my thyroid?',
               onTap: onSuggestionTap,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             _SuggestionChip(
               label: 'What does my cholesterol mean?',
               onTap: onSuggestionTap,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: KoshikaSpacing.sm),
             _SuggestionChip(
               label: 'Which values are out of range?',
               onTap: onSuggestionTap,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.lock_outline,
-                  size: 14,
-                  color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'All processing happens on your device',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.onSurfaceVariant.withValues(alpha: 0.6),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -1164,11 +1290,13 @@ class _SuggestionChip extends StatelessWidget {
     return GestureDetector(
       onTap: () => onTap?.call(label),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: KoshikaSpacing.base,
+          vertical: KoshikaSpacing.md,
+        ),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: KoshikaRadius.xl,
           color: AppColors.surfaceContainerLow,
-          border: Border.all(color: AppColors.outlineVariant),
         ),
         child: Text(
           '"$label"',
@@ -1198,7 +1326,7 @@ class _ErrorView extends StatelessWidget {
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(KoshikaSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1215,25 +1343,22 @@ class _ErrorView extends StatelessWidget {
                 color: AppColors.error,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: KoshikaSpacing.base),
             Text(
               'Something went wrong',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+              style: KoshikaTypography.sectionHeader.copyWith(
+                fontSize: 20,
                 color: AppColors.onSurface,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: KoshikaSpacing.md),
             if (modelInfo.errorMessage != null)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(KoshikaSpacing.base),
                 decoration: BoxDecoration(
                   color: AppColors.errorContainer.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.error.withValues(alpha: 0.2),
-                  ),
+                  borderRadius: KoshikaRadius.lg,
                 ),
                 child: Text(
                   modelInfo.errorMessage!,
@@ -1243,10 +1368,9 @@ class _ErrorView extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
-            const SizedBox(height: 24),
+            const SizedBox(height: KoshikaSpacing.xl),
             FilledButton.icon(
               onPressed: onRetry,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),

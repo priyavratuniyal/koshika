@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 import 'biomarker_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -227,7 +228,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           a.flag != BiomarkerFlag.critical) {
         return 1;
       }
-      return 0;
+      return a.displayName.compareTo(b.displayName);
     });
 
     final allHistories = objectbox.getHistoryForBiomarkers(
@@ -252,7 +253,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _buildAppBar(context),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                    padding: const EdgeInsets.fromLTRB(
+                      KoshikaSpacing.screenHorizontal,
+                      KoshikaSpacing.screenVertical,
+                      KoshikaSpacing.screenHorizontal,
+                      KoshikaSpacing.xxl,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -263,7 +269,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           criticalCount: criticalCount,
                           lastReport: lastReport,
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: KoshikaSpacing.xl),
 
                         // ── Attention Needed ─────────────────────────────
                         if (outOfRangeResults.isNotEmpty) ...[
@@ -274,17 +280,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     onPressed: () {},
                                     child: Text(
                                       'View All',
-                                      style: TextStyle(
-                                        color: AppColors.secondary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                        letterSpacing: 0.8,
-                                      ),
+                                      style: KoshikaTypography.metricLabel
+                                          .copyWith(color: AppColors.secondary),
                                     ),
                                   )
                                 : null,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: KoshikaSpacing.md),
                           ...outOfRangeResults
                               .take(3)
                               .map(
@@ -305,12 +307,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   ),
                                 ),
                               ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: KoshikaSpacing.xl),
                         ],
 
                         // ── Category Trends ──────────────────────────────
                         _SectionHeader(title: 'Core Category Trends'),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: KoshikaSpacing.md),
                         ...categories.map((cat) {
                           final catResults = latestResults.values
                               .where((r) => r.category == cat)
@@ -325,7 +327,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           final badge = _categoryStatusBadge(catResults);
                           final icon = _categoryIcons[cat] ?? Icons.science;
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.only(
+                              bottom: KoshikaSpacing.md,
+                            ),
                             child: _CategoryTrendCard(
                               category: cat,
                               icon: icon,
@@ -349,7 +353,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                         // ── Clinical Insights ────────────────────────────
                         if (insights.isNotEmpty) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: KoshikaSpacing.md),
                           _InsightsCard(insights: insights),
                         ],
                       ],
@@ -365,38 +369,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return SafeArea(
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(40),
+          padding: const EdgeInsets.all(KoshikaSpacing.xxxl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 80,
-                height: 80,
+                width: 120,
+                height: 120,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryContainer.withValues(alpha: 0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.biotech_outlined,
-                  size: 40,
+                  size: 60,
                   color: AppColors.primary,
                 ),
               ),
-              const SizedBox(height: 24),
-              const Text(
+              const SizedBox(height: KoshikaSpacing.xl),
+              Text(
                 'No lab reports yet',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.onSurface,
-                ),
+                style: KoshikaTypography.sectionHeader,
               ),
-              const SizedBox(height: 8),
-              const Text(
+              const SizedBox(height: KoshikaSpacing.sm),
+              Text(
                 'Import a lab report PDF from the Reports tab to get started.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.onSurfaceVariant,
+                style: KoshikaTypography.cardSubtitle.copyWith(
+                  color: AppColors.textSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -414,12 +413,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: AppColors.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      shadowColor: Colors.black12,
-      titleSpacing: 20,
-      title: const Text(
+      titleSpacing: KoshikaSpacing.lg,
+      title: Text(
         'Koshika',
-        style: TextStyle(
-          fontWeight: FontWeight.w800,
+        style: KoshikaTypography.sectionHeader.copyWith(
           color: AppColors.primary,
           fontSize: 20,
           letterSpacing: -0.3,
@@ -465,10 +462,7 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.primaryContainer,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: KoshikaDecorations.heroCard,
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
@@ -486,32 +480,29 @@ class _HeroCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(KoshikaSpacing.xxl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Label
                 Text(
                   'CLINICAL STATUS',
-                  style: TextStyle(
+                  style: KoshikaTypography.metricLabel.copyWith(
                     color: AppColors.onPrimaryContainer.withValues(alpha: 0.8),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
                     letterSpacing: 1.4,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: KoshikaSpacing.xs),
                 // Status title
                 Text(
                   _statusTitle,
-                  style: const TextStyle(
+                  style: KoshikaTypography.sectionHeader.copyWith(
                     color: Colors.white,
                     fontSize: 28,
-                    fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: KoshikaSpacing.sm),
                 // Description
                 Text(
                   _statusDescription,
@@ -521,33 +512,32 @@ class _HeroCard extends StatelessWidget {
                     height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: KoshikaSpacing.xl),
                 // Stats row
-                Row(
+                Wrap(
+                  spacing: KoshikaSpacing.xxl,
+                  runSpacing: KoshikaSpacing.sm,
                   children: [
                     _StatItem(
                       value: '$totalTracked',
-                      label: 'Biomarkers\nTracked',
+                      label: 'TRACKED',
                       valueColor: Colors.white,
                     ),
-                    const SizedBox(width: 32),
                     _StatItem(
                       value: '$abnormalCount',
-                      label: 'Abnormal\nFlags',
+                      label: 'FLAGGED',
                       valueColor: abnormalCount > 0
                           ? const Color(0xFFFFB4AB)
                           : Colors.white,
                     ),
-                    if (lastReport != null) ...[
-                      const SizedBox(width: 32),
+                    if (lastReport != null)
                       _StatItem(
                         value: DateFormat(
                           'MMM d',
                         ).format(lastReport!.reportDate),
-                        label: 'Last\nReport',
+                        label: 'LAST REPORT',
                         valueColor: AppColors.onPrimaryContainer,
                       ),
-                    ],
                   ],
                 ),
               ],
@@ -577,21 +567,15 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(
           value,
-          style: TextStyle(
+          style: KoshikaTypography.heroMetric.copyWith(
             color: valueColor,
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
+            fontSize: 36,
           ),
         ),
         Text(
           label,
-          style: TextStyle(
+          style: KoshikaTypography.metricLabel.copyWith(
             color: AppColors.onPrimaryContainer.withValues(alpha: 0.6),
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-            height: 1.4,
           ),
         ),
       ],
@@ -680,20 +664,20 @@ class _AttentionCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: _bgColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: KoshikaRadius.xxl,
         ),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(KoshikaSpacing.base),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: _iconBgColor,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: KoshikaRadius.lg,
               ),
               child: Icon(_icon, color: _iconColor, size: 20),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: KoshikaSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -711,30 +695,28 @@ class _AttentionCard extends StatelessWidget {
                     '${result.formattedValue} ${result.unit ?? ''} · Ref: ${result.formattedRefRange}',
                     style: const TextStyle(
                       fontSize: 12,
-                      color: AppColors.onSurfaceVariant,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: KoshikaSpacing.sm),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(20),
+                color: AppColors.surfaceContainerLowest.withValues(alpha: 0.5),
+                borderRadius: KoshikaRadius.pill,
               ),
               child: Text(
                 _flagLabel.toUpperCase(),
-                style: TextStyle(
+                style: KoshikaTypography.metricLabel.copyWith(
                   fontSize: 10,
-                  fontWeight: FontWeight.w700,
                   color: _iconColor,
-                  letterSpacing: 0.5,
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: KoshikaSpacing.xs),
             const Icon(
               Icons.chevron_right,
               size: 18,
@@ -775,13 +757,14 @@ class _CategoryTrendCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final biomarkerNames = results.map((r) => r.displayName).take(3).join(', ');
+    final catColor = AppColors.categoryColor(category);
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: KoshikaRadius.xxl,
       ),
-      padding: const EdgeInsets.all(20),
+      padding: KoshikaSpacing.cardPaddingAsymmetric,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -790,12 +773,12 @@ class _CategoryTrendCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(KoshikaSpacing.sm),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(10),
+                  color: catColor.withValues(alpha: 0.1),
+                  borderRadius: KoshikaRadius.lg,
                 ),
-                child: Icon(icon, color: AppColors.primary, size: 20),
+                child: Icon(icon, color: catColor, size: 20),
               ),
               const Spacer(),
               Container(
@@ -805,13 +788,12 @@ class _CategoryTrendCard extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: badgeBgColor,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: KoshikaRadius.md,
                 ),
                 child: Text(
                   badgeLabel.toUpperCase(),
-                  style: TextStyle(
+                  style: KoshikaTypography.metricLabel.copyWith(
                     fontSize: 9,
-                    fontWeight: FontWeight.w700,
                     color: badgeColor,
                     letterSpacing: 0.6,
                   ),
@@ -819,7 +801,7 @@ class _CategoryTrendCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: KoshikaSpacing.md),
           Text(
             category,
             style: const TextStyle(
@@ -833,12 +815,12 @@ class _CategoryTrendCard extends StatelessWidget {
             biomarkerNames,
             style: const TextStyle(
               fontSize: 11,
-              color: AppColors.onSurfaceVariant,
+              color: AppColors.textSecondary,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: KoshikaSpacing.base),
           // Mini bar chart
           SizedBox(
             height: 48,
@@ -857,7 +839,7 @@ class _CategoryTrendCard extends StatelessWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           color: isLatest
-                              ? AppColors.primary
+                              ? catColor
                               : AppColors.outlineVariant.withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(3),
                         ),
@@ -868,12 +850,12 @@ class _CategoryTrendCard extends StatelessWidget {
               }).toList(),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: KoshikaSpacing.md),
           // Biomarker rows
           ...results.map(
             (r) => InkWell(
               onTap: () => onTap(r),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: KoshikaRadius.md,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
                 child: Row(
@@ -895,9 +877,9 @@ class _CategoryTrendCard extends StatelessWidget {
                         color: AppColors.onSurface,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: KoshikaSpacing.sm),
                     _FlagDot(flag: r.flag),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: KoshikaSpacing.xs),
                     const Icon(
                       Icons.chevron_right,
                       size: 14,
@@ -926,16 +908,16 @@ class _FlagDot extends StatelessWidget {
   Color get _color {
     switch (flag) {
       case BiomarkerFlag.normal:
-        return const Color(0xFF2D6A4F);
+        return AppColors.success;
       case BiomarkerFlag.borderline:
-        return const Color(0xFFB45309);
+        return AppColors.warning;
       case BiomarkerFlag.low:
       case BiomarkerFlag.high:
         return AppColors.error;
       case BiomarkerFlag.critical:
         return AppColors.error;
       case BiomarkerFlag.unknown:
-        return AppColors.onSurfaceVariant;
+        return AppColors.textMuted;
     }
   }
 
@@ -962,30 +944,22 @@ class _InsightsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.outlineVariant.withValues(alpha: 0.3),
-        ),
-      ),
-      padding: const EdgeInsets.all(20),
+      decoration: KoshikaDecorations.insightCard,
+      padding: KoshikaSpacing.cardPaddingAsymmetric,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Clinical Insights',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
+            style: KoshikaTypography.sectionHeader.copyWith(
               fontSize: 18,
-              color: AppColors.onSurface,
-              letterSpacing: -0.3,
+              color: Colors.white,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: KoshikaSpacing.md),
           ...insights.map(
             (insight) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: KoshikaSpacing.sm),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -994,7 +968,7 @@ class _InsightsCard extends StatelessWidget {
                     height: 6,
                     margin: const EdgeInsets.only(top: 6, right: 10),
                     decoration: const BoxDecoration(
-                      color: AppColors.primary,
+                      color: AppColors.onTertiaryContainer,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1003,7 +977,7 @@ class _InsightsCard extends StatelessWidget {
                       insight,
                       style: const TextStyle(
                         fontSize: 14,
-                        color: AppColors.onSurfaceVariant,
+                        color: AppColors.onTertiaryContainer,
                         height: 1.5,
                       ),
                     ),
@@ -1034,12 +1008,7 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-            color: AppColors.onSurface,
-            letterSpacing: -0.2,
-          ),
+          style: KoshikaTypography.sectionHeader.copyWith(fontSize: 18),
         ),
         if (action != null) ...[const Spacer(), action!],
       ],

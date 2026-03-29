@@ -127,7 +127,9 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(16, 557227151494494808),
         name: 'embedding',
         type: 28,
-        flags: 0,
+        flags: 8,
+        indexId: const obx_int.IdUid(6, 3191674845316224774),
+        hnswParams: obx_int.ModelHnswParams(dimensions: 384),
       ),
     ],
     relations: <obx_int.ModelRelation>[],
@@ -375,7 +377,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
     generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
     lastEntityId: const obx_int.IdUid(5, 1397208082251365964),
-    lastIndexId: const obx_int.IdUid(5, 2477129363995053950),
+    lastIndexId: const obx_int.IdUid(6, 3191674845316224774),
     lastRelationId: const obx_int.IdUid(0, 0),
     lastSequenceId: const obx_int.IdUid(0, 0),
     retiredEntityUids: const [],
@@ -873,7 +875,7 @@ class BiomarkerResult_ {
   );
 
   /// See [BiomarkerResult.embedding].
-  static final embedding = obx.QueryDoubleVectorProperty<BiomarkerResult>(
+  static final embedding = obx.QueryHnswProperty<BiomarkerResult>(
     _entities[0].properties[15],
   );
 }

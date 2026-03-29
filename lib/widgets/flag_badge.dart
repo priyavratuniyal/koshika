@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../models/models.dart';
+import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 
 class FlagBadge extends StatelessWidget {
   final BiomarkerFlag flag;
@@ -8,49 +11,24 @@ class FlagBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color color;
-    String text;
-
-    switch (flag) {
-      case BiomarkerFlag.normal:
-        color = Colors.green;
-        text = 'N';
-        break;
-      case BiomarkerFlag.borderline:
-        color = Colors.amber;
-        text = 'B';
-        break;
-      case BiomarkerFlag.low:
-        color = Colors.orange;
-        text = 'L';
-        break;
-      case BiomarkerFlag.high:
-        color = Colors.red;
-        text = 'H';
-        break;
-      case BiomarkerFlag.critical:
-        color = Colors.red[900]!;
-        text = 'C';
-        break;
-      case BiomarkerFlag.unknown:
-        color = Colors.grey;
-        text = '-';
-        break;
-    }
+    final (color, text) = switch (flag) {
+      BiomarkerFlag.normal => (AppColors.success, 'N'),
+      BiomarkerFlag.borderline => (AppColors.warning, 'B'),
+      BiomarkerFlag.low => (AppColors.error, 'L'),
+      BiomarkerFlag.high => (AppColors.error, 'H'),
+      BiomarkerFlag.critical => (AppColors.error, 'C'),
+      BiomarkerFlag.unknown => (AppColors.textMuted, '-'),
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.15),
+        borderRadius: KoshikaRadius.lg,
       ),
       child: Text(
         text,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
-        ),
+        style: KoshikaTypography.statusText.copyWith(color: color),
       ),
     );
   }

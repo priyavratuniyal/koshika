@@ -20,11 +20,13 @@ dependencies:
   share_plus: ^10.1.4
   path: ^1.9.1
 
+  # Typography
+  google_fonts: ^6.2.1
+
   # Charts & visualization
   fl_chart: ^0.70.2
 
   # On-device LLM inference
-  flutter_gemma: ^0.12.5
 
   # Utilities
   intl: ^0.20.2
@@ -37,6 +39,18 @@ dependencies:
   fhir_r4: ^0.5.1
   google_mlkit_text_recognition: ^0.13.1
   pdfx: ^2.6.0
+  llamadart: ^0.6.8
+
+hooks:
+  user_defines:
+    llamadart:
+      llamadart_native_backends:
+        platforms:
+          android-arm64:
+            backends: [cpu]
+            cpu_profile: compact
+          android-x64:
+            backends: [cpu]
 
 dev_dependencies:
   flutter_test:

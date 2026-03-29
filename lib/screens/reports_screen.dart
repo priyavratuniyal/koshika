@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../main.dart';
 import '../theme/app_colors.dart';
+import '../theme/koshika_design_system.dart';
 import '../models/models.dart';
 import '../services/extraction_diagnostics.dart';
 import '../services/fhir_export_service.dart';
@@ -143,7 +144,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
       if (importResult.success) {
         // Index new results in VectorStore for semantic search
-        if (importResult.report != null && vectorStoreService.isReady) {
+        if (kAiEnabled &&
+            importResult.report != null &&
+            vectorStoreService.isReady) {
           final newResults = objectbox.getResultsForReport(
             importResult.report!.id,
           );
@@ -295,7 +298,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       body: reports.isEmpty
           ? Center(
               child: Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(KoshikaSpacing.xxl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -314,14 +317,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: KoshikaSpacing.xl),
                     Text(
                       'No reports imported',
-                      style: theme.textTheme.headlineSmall?.copyWith(
+                      style: KoshikaTypography.sectionHeader.copyWith(
                         color: AppColors.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: KoshikaSpacing.sm),
                     Text(
                       'Tap the button below to import your first lab report PDF.',
                       style: theme.textTheme.bodyMedium?.copyWith(
@@ -334,60 +337,60 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(KoshikaSpacing.base),
               itemCount: reports.length,
               itemBuilder: (context, index) {
                 final report = reports[index];
-                return Dismissible(
-                  key: Key('report-${report.id}'),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 24),
-                    decoration: BoxDecoration(
-                      color: AppColors.error,
-                      borderRadius: BorderRadius.circular(16),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: KoshikaSpacing.md),
+                  child: Dismissible(
+                    key: Key('report-${report.id}'),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: KoshikaSpacing.xl),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: KoshikaRadius.xxl,
+                      ),
+                      child: const Icon(Icons.delete, color: Colors.white),
                     ),
-                    child: const Icon(Icons.delete, color: Colors.white),
-                  ),
-                  confirmDismiss: (_) async {
-                    return await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Delete Report?'),
-                            content: Text(
-                              'Delete "${report.labName ?? report.originalFileName ?? "Lab Report"}" and all its biomarker results?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(false),
-                                child: const Text('Cancel'),
+                    confirmDismiss: (_) async {
+                      return await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Delete Report?'),
+                              content: Text(
+                                'Delete "${report.labName ?? report.originalFileName ?? "Lab Report"}" and all its biomarker results?',
                               ),
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(true),
-                                child: const Text(
-                                  'Delete',
-                                  style: TextStyle(color: Colors.red),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: const Text('Cancel'),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ) ??
-                        false;
-                  },
-                  onDismissed: (_) {
-                    objectbox.deleteReport(report.id);
-                    try {
-                      final file = File(report.pdfPath);
-                      if (file.existsSync()) {
-                        file.deleteSync();
-                      }
-                    } catch (_) {}
-                    setState(() {});
-                  },
-                  child: Card(
-                    color: Colors.white,
-                    child: ListTile(
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  child: Text(
+                                    'Delete',
+                                    style: TextStyle(color: AppColors.error),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ) ??
+                          false;
+                    },
+                    onDismissed: (_) {
+                      objectbox.deleteReport(report.id);
+                      try {
+                        final file = File(report.pdfPath);
+                        if (file.existsSync()) {
+                          file.deleteSync();
+                        }
+                      } catch (_) {}
+                      setState(() {});
+                    },
+                    child: GestureDetector(
                       onTap: () {
                         Navigator.of(context)
                             .push(
@@ -398,34 +401,51 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             )
                             .then((_) => setState(() {}));
                       },
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.primaryContainer.withValues(
-                          alpha: 0.15,
+                      child: Container(
+                        decoration: KoshikaDecorations.card,
+                        padding: KoshikaSpacing.cardPaddingAsymmetric,
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: AppColors.primaryContainer
+                                  .withValues(alpha: 0.15),
+                              child: const Icon(
+                                Icons.description_outlined,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: KoshikaSpacing.base),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    report.labName ??
+                                        report.originalFileName ??
+                                        'Lab Report',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: KoshikaSpacing.xs),
+                                  Text(
+                                    '${report.reportDate.day}/${report.reportDate.month}/${report.reportDate.year}'
+                                    ' • ${report.extractedCount} biomarkers',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right,
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ],
                         ),
-                        child: const Icon(
-                          Icons.description_outlined,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      title: Text(
-                        report.labName ??
-                            report.originalFileName ??
-                            'Lab Report',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onSurface,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${report.reportDate.day}/${report.reportDate.month}/${report.reportDate.year}'
-                        ' • ${report.extractedCount} biomarkers',
-                        style: const TextStyle(
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                      ),
-                      trailing: const Icon(
-                        Icons.chevron_right,
-                        color: AppColors.onSurfaceVariant,
                       ),
                     ),
                   ),
