@@ -173,9 +173,15 @@ class QueryRouter {
           confidence: result.confidence,
         );
 
+      case PrefilterResult.emergencyDetected:
+        return QueryRouteResult(
+          decision: QueryDecision.escalateUrgentMedical,
+          deterministicResponse: ResponseTemplates.emergencyEscalation,
+          confidence: result.confidence,
+        );
+
       case PrefilterResult.likelyHealthQuery:
       case PrefilterResult.ambiguous:
-      case PrefilterResult.emergencyDetected:
         return _applyStrictnessMode(
           QueryRouteResult(
             decision: QueryDecision.answerGeneralHealth,
