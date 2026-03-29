@@ -141,9 +141,7 @@ class _HfTokenTileState extends State<HfTokenTile> {
               Container(
                 padding: const EdgeInsets.all(KoshikaSpacing.sm),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.secondaryContainer.withValues(
-                    alpha: 0.4,
-                  ),
+                  color: theme.colorScheme.surfaceContainerLow,
                   borderRadius: KoshikaRadius.md,
                 ),
                 child: Row(
@@ -152,14 +150,14 @@ class _HfTokenTileState extends State<HfTokenTile> {
                     Icon(
                       Icons.info_outline,
                       size: 18,
-                      color: theme.colorScheme.secondary,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: KoshikaSpacing.sm),
                     Expanded(
                       child: Text(
                         LlmStrings.hfTokenInfoMessage,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
