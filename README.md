@@ -51,6 +51,14 @@ Base features (parsing, trends, export) work immediately. AI chat is optional 鈥
 
 ## How it Works
 
+```mermaid
+flowchart LR
+    A([PDF Lab\nReport]) --> B["<b>Parse</b>\nRegex + OCR\n+ Fuzzy Match"]
+    B --> C[("<b>Store</b>\nObjectBox\nLocal DB")]
+    C --> D["<b>Insights</b>\nTrends 路 Gauges\n路 FHIR Export"]
+    C --> E["<b>AI Chat</b>\nRAG 路 LLM\n路 Citations"]
+```
+
 ### 1. PDF Import & Parsing
 
 ```mermaid
