@@ -51,43 +51,50 @@ Base features (parsing, trends, export) work immediately. AI chat is optional �
 
 ## How it Works
 
+### 1. PDF Import & Parsing
+
 ```mermaid
 flowchart LR
-    subgraph IMPORT["PDF Import"]
-        A([Lab Report PDF]) --> B{Text\nextractable?}
-        B -->|Yes| C[Syncfusion PDF]
-        B -->|No| D[ML Kit OCR]
-    end
-
-    subgraph PARSE["Parsing Engine"]
-        C --> E[4-Pattern Regex]
-        D --> E
-        E --> F[Fuzzy Match\n63 biomarkers]
-    end
-
+    A([Lab Report\nPDF]) --> B{Text\nextractable?}
+    B -->|Yes| C[Syncfusion\nPDF]
+    B -->|No| D[Google ML Kit\nOCR]
+    C --> E[4-Pattern\nRegex Engine]
+    D --> E
+    E --> F[Fuzzy Match\n63 biomarkers]
     F --> G[(ObjectBox\nLocal DB)]
-
-    subgraph INSIGHTS["Insights"]
-        G --> H[Dashboard &\nTrend Charts]
-        G --> I[FHIR R4\nExport]
-        G --> J[Embed\n384-dim vectors]
-    end
-
-    subgraph AI["On-Device AI Chat"]
-        J --> K[HNSW\nVector Index]
-        L([User Question]) --> M[Intent\nRouter]
-        M --> K
-        K --> N[RAG Context]
-        N --> O[LLM Generation\n+ Validation]
-        O --> P([Citation-backed\nResponse])
-    end
 ```
 
-**Import** → PDFs are parsed on-device using text extraction or OCR, then run through a multi-pattern regex engine that fuzzy-matches results against a LOINC-coded biomarker dictionary.
+PDFs are parsed on-device using text extraction or OCR, then run through a multi-pattern regex engine that fuzzy-matches results against a LOINC-coded biomarker dictionary.
 
-**Insights** → Parsed data powers trend charts with reference ranges, borderline detection, and FHIR-compliant export.
+### 2. Insights & Export
 
-**AI Chat** → Questions go through two-stage intent routing (regex prefilter + embedding classifier), then a RAG pipeline searches your lab values semantically and generates grounded, citation-backed responses. 4 curated GGUF models (360M–1B) or bring your own. Safety gates catch emergencies, hallucinations, and prohibited content before anything reaches the user.
+```mermaid
+flowchart LR
+    G[(ObjectBox)] --> H[Dashboard\n& Trends]
+    G --> I[Biomarker\nDetail View]
+    G --> J[FHIR R4\nExport]
+    H --> H1[Severity badges\n& sparklines]
+    I --> I1[Trend chart\n+ ref gauge]
+    J --> J1[LOINC codes\n+ UCUM units]
+```
+
+Parsed data powers trend charts with reference ranges, borderline detection (values within 10% of boundaries), and FHIR-compliant export for sharing with doctors or other systems.
+
+### 3. On-Device AI Chat
+
+```mermaid
+flowchart LR
+    A([User\nQuestion]) --> B[Intent Router\nregex + embeddings]
+    B -->|Emergency\nor off-topic| C([Deterministic\nresponse])
+    B -->|Needs LLM| D[Embed query\n384-dim]
+    D --> E[HNSW\ntop-5 search]
+    E --> F[RAG\ncontext]
+    F --> G[LLM\ngeneration]
+    G --> H[Output\nvalidation]
+    H --> I([Citation-backed\nresponse])
+```
+
+Questions go through two-stage intent routing (regex prefilter + embedding classifier), then a RAG pipeline searches your lab values semantically and generates grounded, citation-backed responses. 4 curated GGUF models (360M–1B) or bring your own. Safety gates catch emergencies, hallucinations, and prohibited content before anything reaches the user.
 
 > **[Full architecture docs →](https://www.koshika.life)**
 
