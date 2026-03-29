@@ -110,34 +110,46 @@ Koshika solves this:
 
 ### AI Pipeline
 
-```
-USER MESSAGE
-     |
-[Stage 1] IntentPrefilter (deterministic regex)
-     |--- Emergency? --> Escalate (deterministic)
-     |--- Off-topic? --> Refuse (deterministic)
-     |--- Lab query? --> Check data availability
-     |--- Health?    --> Route to context
-     |--- Ambiguous? --> Stage 2
-     |
-[Stage 2] IntentClassifier (embedding cosine similarity to category centroids)
-     |
-ROUTING DECISION (QueryRouter)
-     |--- Deterministic response? --> Return immediately (no LLM)
-     |--- Requires LLM? --> Continue
-     |
-[Context] ChatContextBuilder
-     |--- Semantic search (embed query -> HNSW top-5) or keyword fallback
-     |
-[Prompt] ChatML assembly (system + history + context + user message)
-     |
-[Generation] LlmService (streaming via llamadart)
-     |
-[Validation] OutputValidator (empty, hallucination, repetition, garbled, prohibited, length)
-     |
-[Citation] CitationExtractor (map [N] references to lab sources)
-     |
-DISPLAY TO USER
+```mermaid
+flowchart TD
+    A([User Message]) --> B
+
+    subgraph S1["Stage 1 — IntentPrefilter (deterministic regex)"]
+        B{Classify}
+        B -->|Emergency| C([Escalate — no LLM])
+        B -->|Off-topic| D([Refuse — no LLM])
+        B -->|Lab query| E{Has lab data?}
+        B -->|Health| G
+        B -->|Ambiguous| F
+        E -->|No| NL([Need lab report — no LLM])
+        E -->|Yes| G
+    end
+
+    subgraph S2["Stage 2 — IntentClassifier (embedding cosine similarity)"]
+        F([Ambiguous query]) --> FC{Classify\nby centroid}
+        FC -->|Low confidence| CQ([Ask clarifying question])
+        FC -->|Resolved| G
+    end
+
+    G[QueryRouter\nRouting Decision] -->|Deterministic| R([Return immediately])
+    G -->|Requires LLM| H
+
+    subgraph RAG["RAG Context Builder"]
+        H[ChatContextBuilder] --> H1[Embed query]
+        H1 --> H2[HNSW top-5 search]
+        H2 --> H3[Keyword fallback if needed]
+    end
+
+    H3 --> I[ChatML Assembly\nsystem · history · context · question]
+    I --> J[LlmService\nstreaming via llamadart]
+    J --> K
+
+    subgraph VAL["Output Validation"]
+        K[OutputValidator] -->|empty / garbled / hallucinated\n/ repetitive / prohibited| KB([Fallback response])
+        K -->|Pass| L[CitationExtractor\nmap N references to lab sources]
+    end
+
+    L --> M([Display to User])
 ```
 
 ### Token Budget (optimized for 1B-param models)
