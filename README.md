@@ -49,44 +49,45 @@ Base features (parsing, trends, export) work immediately. AI chat is optional �
 
 ---
 
-## How the AI Works
-
-Two-stage intent routing keeps responses safe and grounded:
+## How it Works
 
 ```mermaid
-flowchart TD
-    A([User Message]) --> B
-
-    subgraph S1["Stage 1 — Regex Prefilter"]
-        B{Classify}
-        B -->|Emergency| C([Escalate — no LLM])
-        B -->|Off-topic| D([Refuse — no LLM])
-        B -->|Lab query| E{Has lab data?}
-        B -->|Health| G
-        B -->|Ambiguous| F
-        E -->|No| NL([Need report first])
-        E -->|Yes| G
+flowchart LR
+    subgraph IMPORT["PDF Import"]
+        A([Lab Report PDF]) --> B{Text\nextractable?}
+        B -->|Yes| C[Syncfusion PDF]
+        B -->|No| D[ML Kit OCR]
     end
 
-    subgraph S2["Stage 2 — Embedding Classifier"]
-        F([Ambiguous]) --> FC{Cosine\nsimilarity}
-        FC -->|Low confidence| CQ([Clarify])
-        FC -->|Resolved| G
+    subgraph PARSE["Parsing Engine"]
+        C --> E[4-Pattern Regex]
+        D --> E
+        E --> F[Fuzzy Match\n63 biomarkers]
     end
 
-    G[Route] -->|Deterministic| R([Instant response])
-    G -->|Needs LLM| H
+    F --> G[(ObjectBox\nLocal DB)]
 
-    subgraph RAG["RAG Pipeline"]
-        H[Embed query] --> H2[HNSW top-5]
-        H2 --> H3[Build context]
+    subgraph INSIGHTS["Insights"]
+        G --> H[Dashboard &\nTrend Charts]
+        G --> I[FHIR R4\nExport]
+        G --> J[Embed\n384-dim vectors]
     end
 
-    H3 --> I[Generate + Validate]
-    I --> M([Response with citations])
+    subgraph AI["On-Device AI Chat"]
+        J --> K[HNSW\nVector Index]
+        L([User Question]) --> M[Intent\nRouter]
+        M --> K
+        K --> N[RAG Context]
+        N --> O[LLM Generation\n+ Validation]
+        O --> P([Citation-backed\nResponse])
+    end
 ```
 
-4 curated GGUF models (360M–1B params) or bring your own. Safety gates catch emergencies, hallucinations, garbled output, and prohibited diagnostic language before anything reaches the user.
+**Import** → PDFs are parsed on-device using text extraction or OCR, then run through a multi-pattern regex engine that fuzzy-matches results against a LOINC-coded biomarker dictionary.
+
+**Insights** → Parsed data powers trend charts with reference ranges, borderline detection, and FHIR-compliant export.
+
+**AI Chat** → Questions go through two-stage intent routing (regex prefilter + embedding classifier), then a RAG pipeline searches your lab values semantically and generates grounded, citation-backed responses. 4 curated GGUF models (360M–1B) or bring your own. Safety gates catch emergencies, hallucinations, and prohibited content before anything reaches the user.
 
 > **[Full architecture docs →](https://www.koshika.life)**
 
