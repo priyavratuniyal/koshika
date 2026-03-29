@@ -181,8 +181,10 @@ Messages are routed through a two-stage classifier — regex prefilter handles e
 
 ---
 
+## Features in Detail
+
 <details>
-<summary><strong>Features in detail</strong></summary>
+<summary>Expand</summary>
 
 ### PDF Parsing Engine
 - Hybrid extraction: digital text (Syncfusion) with OCR fallback (Google ML Kit)
@@ -212,8 +214,12 @@ Messages are routed through a two-stage classifier — regex prefilter handles e
 
 </details>
 
+---
+
+## Tech Stack
+
 <details>
-<summary><strong>Tech stack</strong></summary>
+<summary>Expand</summary>
 
 | Layer | Technology |
 |-------|-----------|
@@ -228,8 +234,12 @@ Messages are routed through a two-stage classifier — regex prefilter handles e
 
 </details>
 
+---
+
+## Project Structure
+
 <details>
-<summary><strong>Project structure</strong></summary>
+<summary>Expand</summary>
 
 ```
 lib/
