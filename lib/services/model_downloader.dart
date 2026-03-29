@@ -88,8 +88,14 @@ class ModelDownloader {
         startByte = tempFile.lengthSync();
       }
 
-      final request = await _client!.getUrl(Uri.parse(url));
-      if (authToken != null && authToken.isNotEmpty) {
+      final uri = Uri.parse(url);
+      final request = await _client!.getUrl(uri);
+      final shouldAttachAuth =
+          authToken != null &&
+          authToken.isNotEmpty &&
+          uri.scheme == 'https' &&
+          _isTrustedHfHost(uri.host);
+      if (shouldAttachAuth) {
         request.headers.add(
           HttpHeaders.authorizationHeader,
           'Bearer $authToken',
@@ -183,5 +189,17 @@ class ModelDownloader {
   void cancel() {
     _cancelled = true;
     _client?.close(force: true);
+  }
+
+  /// Whether [host] belongs to a known Hugging Face domain.
+  static bool _isTrustedHfHost(String host) {
+    final normalized = host.toLowerCase();
+    const trustedHosts = {
+      'huggingface.co',
+      'hf.co',
+      'cdn-lfs.huggingface.co',
+      'cdn-lfs-us-1.huggingface.co',
+    };
+    return trustedHosts.contains(normalized);
   }
 }

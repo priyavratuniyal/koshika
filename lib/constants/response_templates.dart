@@ -6,7 +6,7 @@ abstract final class ResponseTemplates {
   /// Shown when the user describes potentially urgent symptoms.
   static const String emergencyEscalation =
       'Your message may describe a medical emergency. '
-      'Please contact emergency services (112) or visit your nearest '
+      'Please contact your local emergency services (e.g., 911/112) or visit your nearest '
       'emergency room immediately.\n\n'
       'Koshika is a lab-report assistant and cannot provide emergency '
       'medical guidance.';

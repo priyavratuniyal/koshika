@@ -13,13 +13,16 @@ import 'llm_service.dart';
 /// This is a class (not static) because the embedding classifier is injected
 /// as an optional constructor dependency.
 class QueryRouter {
-  final IntentClassifier? _classifier;
+  final IntentClassifier? Function() _classifierGetter;
 
-  /// Create a router with an optional Stage 2 embedding classifier.
+  /// Create a router with a lazy Stage 2 embedding classifier.
   ///
-  /// When [classifier] is null or not ready, falls back to Stage 1
-  /// (regex/keyword) only.
-  QueryRouter({IntentClassifier? classifier}) : _classifier = classifier;
+  /// [classifierGetter] is called at route time so the classifier can become
+  /// available after the router is constructed (e.g. once embeddings load).
+  /// When the getter returns null or the classifier isn't ready, falls back
+  /// to Stage 1 (regex/keyword) only.
+  QueryRouter({required IntentClassifier? Function() classifierGetter})
+    : _classifierGetter = classifierGetter;
 
   /// Classify the [message] and decide how to respond.
   ///
@@ -123,8 +126,8 @@ class QueryRouter {
       }
     }
 
-    // Fall through to Stage 2 classifier
-    final classifier = _classifier;
+    // Fall through to Stage 2 classifier (resolved lazily)
+    final classifier = _classifierGetter();
     if (classifier == null || !classifier.isReady) {
       // No Stage 2 — default to general health (safe fallback)
       return _applyStrictnessMode(

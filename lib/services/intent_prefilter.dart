@@ -67,11 +67,12 @@ abstract final class IntentPrefilter {
 
   /// Phrases that explicitly reference the user's own reports or results.
   static final _personalLabPatterns = [
-    // Explicit report/result references (English)
-    RegExp(r'lab\s*report', caseSensitive: false),
-    RegExp(r'test\s*result', caseSensitive: false),
-    RegExp(r'blood\s*test', caseSensitive: false),
-    RegExp(r'blood\s*work', caseSensitive: false),
+    // Possessive + report/result references (English + Hinglish)
+    // "my lab report", "mera test result", "my blood test"
+    RegExp(
+      '$_possessive\\s+(lab\\s*report|test\\s*results?|blood\\s*test|blood\\s*work)\\b',
+      caseSensitive: false,
+    ),
 
     // Possessive + generic result words (English + Hinglish)
     RegExp(
@@ -83,15 +84,24 @@ abstract final class IntentPrefilter {
     // "my cholesterol", "mera sugar", "meri thyroid"
     RegExp('$_possessive\\s+$_biomarkerAlt\\b', caseSensitive: false),
 
-    // "is my ... high/low/normal" (English)
-    RegExp(r'is\s+my\b', caseSensitive: false),
-    // "why is my ... high/low"
-    RegExp(r'why\s+(is|are)\s+my\b', caseSensitive: false),
-    // "show me my", "check my"
-    RegExp(r'(show|check|tell)\s*(me\s+)?my\b', caseSensitive: false),
+    // "is my <medical term> high/low/normal" (English)
+    RegExp(
+      'is\\s+$_possessive\\s+($_biomarkerAlt|report|results?|levels?|values?|numbers?|test)\\b',
+      caseSensitive: false,
+    ),
+    // "why is my <medical term> high/low"
+    RegExp(
+      'why\\s+(is|are)\\s+$_possessive\\s+($_biomarkerAlt|report|results?|levels?|values?|numbers?|test)\\b',
+      caseSensitive: false,
+    ),
+    // "show me my <medical term>", "check my <medical term>"
+    RegExp(
+      '(show|check|tell)\\s*(me\\s+)?$_possessive\\s+($_biomarkerAlt|report|results?|levels?|values?|numbers?|test)\\b',
+      caseSensitive: false,
+    ),
 
     // Hinglish report phrases
-    // "meri report dikhao", "report dikhao", "mera report"
+    // "meri report dikhao", "mera report"
     RegExp('$_possessive\\s*report', caseSensitive: false),
     // "kitna hai" / "kitni hai" (how much is) — common Hinglish question form
     RegExp('$_biomarkerAlt\\s*(kitna|kitni|kitne)\\b', caseSensitive: false),
@@ -102,7 +112,7 @@ abstract final class IntentPrefilter {
     // Only match medical compound units — excludes bare "g", "%", "ml" to
     // avoid false positives like "5g network", "100% sure", "500ml water".
     RegExp(
-      r'\d+\.?\d*\s*(mg/dl|mg/l|mmol/l|mmol|miu/l|miu/ml|iu/l|iu/ml|µg/dl|µg/l|ng/ml|ng/dl|pg/ml|g/dl|g/l|meq/l|u/l|cells/cumm|lakh|thousand)',
+      r'\d+\.?\d*\s*(mg/dl|mg/l|mmol/l|mmol|miu/l|miu/ml|iu/l|iu/ml|µg/dl|µg/l|ng/ml|ng/dl|pg/ml|g/dl|g/l|meq/l|u/l|cells/cumm)',
       caseSensitive: false,
     ),
   ];
