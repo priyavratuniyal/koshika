@@ -62,47 +62,89 @@ flowchart LR
 ### 1. PDF Import & Parsing
 
 ```mermaid
-flowchart LR
-    A([Lab Report\nPDF]) --> B{Text\nextractable?}
-    B -->|Yes| C[Syncfusion\nPDF]
-    B -->|No| D[Google ML Kit\nOCR]
-    C --> E[4-Pattern\nRegex Engine]
-    D --> E
-    E --> F[Fuzzy Match\n63 biomarkers]
-    F --> G[(ObjectBox\nLocal DB)]
+flowchart TD
+    A([Lab Report PDF]) --> B[PdfTextExtractor\nSyncfusion]
+    B --> C{Page has\n≥35 chars?}
+    C -->|Yes| F
+    C -->|No / sparse| D[PdfPageRenderService\nrender to PNG]
+    D --> E[OcrTextRecognitionService\nGoogle ML Kit]
+    E --> E2[OcrRowReconstructor\ngroup by geometry]
+    E2 --> F
+
+    F[LabReportParser] --> F1[Pattern A: space-delimited]
+    F --> F2[Pattern B: colon-separated]
+    F --> F3[Pattern C: pipe-separated]
+    F --> F4[Pattern D: loose catch-all]
+
+    F1 & F2 & F3 & F4 --> G[RawLabRows]
+    G --> H[BiomarkerDictionary\nfuzzyMatch]
+    H --> H1[Exact alias lookup]
+    H --> H2[Substring match]
+    H --> H3["Dice coefficient (≥0.6)"]
+
+    H1 & H2 & H3 --> I[BiomarkerResult\nvalue · unit · refRange · flag]
+    I --> J[computeFlag\nnormal · borderline · low · high · critical]
+    J --> K[(ObjectBox\nsaveReportWithResults)]
 ```
 
-PDFs are parsed on-device using text extraction or OCR, then run through a multi-pattern regex engine that fuzzy-matches results against a LOINC-coded biomarker dictionary.
+Each page is extracted digitally first; pages with sparse text fall back to OCR (render → ML Kit → row reconstruction). Raw text runs through 4 regex patterns, and matched rows are fuzzy-matched against 63 biomarker definitions. Values are parsed, reference ranges extracted, and flags computed (including 10% borderline detection).
 
 ### 2. Insights & Export
 
 ```mermaid
-flowchart LR
-    G[(ObjectBox)] --> H[Dashboard\n& Trends]
-    G --> I[Biomarker\nDetail View]
-    G --> J[FHIR R4\nExport]
-    H --> H1[Severity badges\n& sparklines]
-    I --> I1[Trend chart\n+ ref gauge]
-    J --> J1[LOINC codes\n+ UCUM units]
+flowchart TD
+    G[(ObjectBox\nLocal DB)] --> D[Dashboard]
+    G --> B[Biomarker Detail]
+    G --> X[FHIR Export]
+
+    D --> D1[Clinical status\nHealthy · Minor Variances\nNeeds Attention · Under Review]
+    D --> D2[Attention panel\ntop 3 out-of-range]
+    D --> D3[Category trend cards\n4-point sparkline · severity badge]
+    D --> D4[Clinical insights\ntrending up/down detection]
+
+    B --> B1[Interactive trend chart\nfl_chart · ref range bands\ncolor-coded dots · tooltips]
+    B --> B2[Reference range gauge\nlow / normal / high zones\ncurrent value marker]
+    B --> B3[Full history table\ndate · lab · value · flag]
+
+    X --> X1[Patient resource]
+    X --> X2[Observation per biomarker\nLOINC code · UCUM unit\ninterpretation code]
+    X --> X3[DiagnosticReport per lab report]
+    X1 & X2 & X3 --> X4([FHIR R4 Bundle\nJSON export])
 ```
 
-Parsed data powers trend charts with reference ranges, borderline detection (values within 10% of boundaries), and FHIR-compliant export for sharing with doctors or other systems.
+The dashboard shows a clinical status overview, flags attention-needed biomarkers, and renders per-category trend cards with sparklines. The detail view has interactive trend charts with reference bands and a custom-painted gauge. FHIR export produces a spec-compliant R4 Bundle with LOINC codes, UCUM units, and interpretation codes.
 
 ### 3. On-Device AI Chat
 
 ```mermaid
-flowchart LR
-    A([User\nQuestion]) --> B[Intent Router\nregex + embeddings]
-    B -->|Emergency\nor off-topic| C([Deterministic\nresponse])
-    B -->|Needs LLM| D[Embed query\n384-dim]
-    D --> E[HNSW\ntop-5 search]
-    E --> F[RAG\ncontext]
-    F --> G[LLM\ngeneration]
-    G --> H[Output\nvalidation]
-    H --> I([Citation-backed\nresponse])
+flowchart TD
+    A([User Message]) --> R[QueryRouter]
+
+    R --> S1[Stage 1: IntentPrefilter\ndeterministic regex]
+    S1 -->|Emergency 17 patterns| EM([Escalate — no LLM])
+    S1 -->|Off-topic| OT([Refuse — no LLM])
+    S1 -->|Lab query + no data| NL([Need report first])
+    S1 -->|Ambiguous| S2[Stage 2: IntentClassifier\nembed → cosine to centroids]
+    S1 -->|Lab / Health| CTX
+
+    S2 -->|Low confidence| CQ([Ask clarifying question])
+    S2 -->|Resolved| CTX
+
+    CTX[ChatContextBuilder]
+    CTX -->|Embeddings loaded| SEM[Semantic: embed query\n→ HNSW top-5 search]
+    CTX -->|Not loaded| KW[Keyword fallback\ncategory matching]
+
+    SEM & KW --> P[ChatML prompt\nsystem · history · context · question]
+    P --> LLM["LlmService\nstreaming via llamadart\n(4 GGUF models or BYOM)"]
+
+    LLM --> V[OutputValidator]
+    V -->|Empty / garbled| RET([Retry up to 3×])
+    V -->|Hallucinated / repetitive\n/ prohibited| FB([Fallback response])
+    V -->|Passed| CIT[CitationExtractor\nmap references to lab sources]
+    CIT --> OUT([Response with\nsource footer])
 ```
 
-Questions go through two-stage intent routing (regex prefilter + embedding classifier), then a RAG pipeline searches your lab values semantically and generates grounded, citation-backed responses. 4 curated GGUF models (360M–1B) or bring your own. Safety gates catch emergencies, hallucinations, and prohibited content before anything reaches the user.
+Messages are routed through a two-stage classifier — regex prefilter handles emergencies, off-topic, and clear intent; ambiguous queries go to an embedding-based centroid classifier. Context is built via semantic search (bge-small-en-v1.5, 384-dim, HNSW) or keyword fallback. The LLM streams a response which is validated for hallucinations, repetition, garbled output, and prohibited diagnostic language. Valid responses get a citation footer mapping `[N]` references back to lab sources.
 
 > **[Full architecture docs →](https://www.koshika.life)**
 
