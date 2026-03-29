@@ -69,7 +69,7 @@ abstract final class LlmStrings {
   /// Info banner text explaining common issues.
   static const String hfTokenInfoMessage =
       'Having a token does not guarantee access. You must also:\n'
-      '  1. Accept the model\'s license on its HuggingFace page\n'
+      '  1. Accept the model\'s license on its Hugging Face page\n'
       '  2. Ensure your token has "Read" permission\n\n'
       'If downloads fail with 401/403 errors after adding a token, visit '
       'the model page and accept the license agreement, then retry.';
@@ -97,10 +97,6 @@ abstract final class LlmStrings {
   /// Snackbar shown when chat message persistence fails.
   static const String persistenceWarning =
       'Could not save chat history for one or more messages.';
-
-  /// Debug log when query routing fails.
-  static const String routingFailedLog =
-      'Query routing failed, falling through to LLM: ';
 
   /// Debug log when retrying after empty/failed generation.
   static const String retryingGenerationLog =

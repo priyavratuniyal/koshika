@@ -75,24 +75,26 @@ class VectorStoreService {
           )
           .build();
 
-      final results = hnswQuery.find();
-      hnswQuery.close();
-
-      return results.map((r) {
-        final docId = '${r.biomarkerKey}_${r.report.targetId}';
-        return RetrievalResult(
-          id: docId,
-          content: _buildChunkText(r),
-          metadata: jsonEncode({
-            'biomarkerKey': r.biomarkerKey,
-            'reportId': r.report.targetId,
-            'flag': r.flag.name,
-            'category': r.category,
-            'testDate': r.testDate.toIso8601String(),
-            'labName': r.report.target?.labName,
-          }),
-        );
-      }).toList();
+      try {
+        final results = hnswQuery.find();
+        return results.map((r) {
+          final docId = '${r.biomarkerKey}_${r.report.targetId}';
+          return RetrievalResult(
+            id: docId,
+            content: _buildChunkText(r),
+            metadata: jsonEncode({
+              'biomarkerKey': r.biomarkerKey,
+              'reportId': r.report.targetId,
+              'flag': r.flag.name,
+              'category': r.category,
+              'testDate': r.testDate.toIso8601String(),
+              'labName': r.report.target?.labName,
+            }),
+          );
+        }).toList();
+      } finally {
+        hnswQuery.close();
+      }
     } catch (e) {
       debugPrint('VectorStoreService.search failed: $e');
       return [];

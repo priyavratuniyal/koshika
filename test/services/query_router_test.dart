@@ -9,7 +9,7 @@ void main() {
 
   setUp(() {
     // No classifier — tests Stage 1 (regex-only) routing
-    router = QueryRouter();
+    router = QueryRouter(classifierGetter: () => null);
   });
 
   group('QueryRouter.route', () {

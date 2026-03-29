@@ -60,7 +60,7 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _contextBuilder = ChatContextBuilder(vectorStore: vectorStoreService);
     _initIntentClassifier();
-    _queryRouter = QueryRouter(classifier: _intentClassifier);
+    _queryRouter = QueryRouter(classifierGetter: () => _intentClassifier);
     _statusSubscription = llmService.modelStatusStream.listen((info) {
       if (mounted) {
         setState(() => _modelInfo = info);
@@ -330,22 +330,23 @@ class _ChatScreenState extends State<ChatScreen> {
     // history-aware routing and prompt injection.
     final history = _buildConversationHistory();
 
-    // Route the query — may short-circuit with a deterministic response
-    late final QueryRouteResult routeResult;
+    // Route the query — may short-circuit with a deterministic response.
+    // Lab-data lookup is separated from routing so that an ObjectBox error
+    // doesn't bypass safety-critical emergency/off-topic detection.
+    var hasLabData = false;
     try {
-      final hasLabData = objectbox.getLatestResults().isNotEmpty;
-      routeResult = await _queryRouter.route(
-        text,
-        hasLabData: hasLabData,
-        conversationHistory: history,
-      );
+      hasLabData = objectbox.getLatestResults().isNotEmpty;
     } catch (e) {
-      // If routing fails (e.g. ObjectBox error), fall through to LLM
-      debugPrint('${LlmStrings.routingFailedLog}$e');
-      routeResult = const QueryRouteResult(
-        decision: QueryDecision.answerGeneralHealth,
+      debugPrint(
+        'Lab data lookup failed; assuming no lab data for routing: $e',
       );
     }
+
+    final routeResult = await _queryRouter.route(
+      text,
+      hasLabData: hasLabData,
+      conversationHistory: history,
+    );
 
     if (!routeResult.requiresLlm) {
       if (mounted) {
