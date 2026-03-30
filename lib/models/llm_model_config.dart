@@ -104,8 +104,8 @@ abstract final class LlmModelRegistry {
       id: 'qwen3-0.6b',
       name: 'Qwen3 0.6B',
       downloadUrl:
-          'https://huggingface.co/bartowski/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
-      estimatedSizeMB: 430,
+          'https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf',
+      estimatedSizeMB: 639,
       description: 'Balanced quality and size',
     ),
     LlmModelConfig(
@@ -120,8 +120,8 @@ abstract final class LlmModelRegistry {
       id: 'gemma3-1b',
       name: 'Gemma 3 1B',
       downloadUrl:
-          'https://huggingface.co/bartowski/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf',
-      estimatedSizeMB: 780,
+          'https://huggingface.co/google/gemma-3-1b-it-qat-q4_0-gguf/resolve/main/gemma-3-1b-it-q4_0.gguf',
+      estimatedSizeMB: 1000,
       description: 'Most capable curated model',
     ),
   ];
