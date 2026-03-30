@@ -133,16 +133,20 @@ abstract final class OutputValidator {
     // Also extract bare numbers from context for reference range matching
     final contextNumbers = _extractBareNumbers(labContext);
 
+    int unmatchedCount = 0;
     for (final value in outputValues) {
       // Check if this value appears in context (exact match on the number)
       final number = value.number;
       if (!contextNumbers.contains(number) &&
           !contextValues.any((cv) => cv.number == number)) {
-        return true;
+        unmatchedCount++;
       }
     }
 
-    return false;
+    // Require multiple unmatched values to flag hallucination — a single
+    // unmatched value is often a legitimate reference range the model
+    // cited from training data (e.g. "normal SGOT is 5-40 U/L").
+    return unmatchedCount >= 3;
   }
 
   /// Pattern for medical values: number + compound unit.
@@ -243,13 +247,9 @@ abstract final class OutputValidator {
   // ─── Prohibited Content ────────────────────────────────────────────
 
   /// Prohibited diagnostic language patterns.
-  /// These indicate the model is making diagnoses instead of explaining values.
+  /// These catch definitive diagnoses — not conditional/educational language.
+  /// Patterns like "could indicate" or "may suggest" are intentionally allowed.
   static final _prohibitedPatterns = [
-    RegExp(
-      r'you\s+have\s+(diabetes|cancer|anemia|disease)',
-      caseSensitive: false,
-    ),
-    RegExp(r'you\s+are\s+suffering\s+from', caseSensitive: false),
     RegExp(r'you\s+are\s+diagnosed\s+with', caseSensitive: false),
     RegExp(r'i\s+diagnose\s+you', caseSensitive: false),
     RegExp(r'your\s+diagnosis\s+is', caseSensitive: false),

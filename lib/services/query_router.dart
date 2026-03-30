@@ -48,6 +48,12 @@ class QueryRouter {
           deterministicResponse: ResponseTemplates.emergencyEscalation,
         );
 
+      case PrefilterResult.pleasantryDetected:
+        return const QueryRouteResult(
+          decision: QueryDecision.conversationalAck,
+          deterministicResponse: ResponseTemplates.pleasantryAck,
+        );
+
       case PrefilterResult.offTopicDetected:
         return const QueryRouteResult(
           decision: QueryDecision.refuseOffTopic,
@@ -111,16 +117,17 @@ class QueryRouter {
 
       if (priorUserTurn != null) {
         final priorIntent = IntentPrefilter.classify(priorUserTurn.content);
-        if (priorIntent == PrefilterResult.likelyLabQuery) {
-          // Prior turn was a lab query — promote this ambiguous follow-up
+        if (priorIntent == PrefilterResult.likelyLabQuery ||
+            priorIntent == PrefilterResult.likelyHealthQuery) {
+          // Prior turn was health/lab related — promote this ambiguous
+          // follow-up (e.g. "how to reduce it?" after "what is SGOT?")
           if (hasLabData) {
             return const QueryRouteResult(
               decision: QueryDecision.answerWithLabContext,
             );
           }
           return const QueryRouteResult(
-            decision: QueryDecision.needLabReportFirst,
-            deterministicResponse: ResponseTemplates.needLabReport,
+            decision: QueryDecision.answerGeneralHealth,
           );
         }
       }
@@ -177,6 +184,13 @@ class QueryRouter {
         return QueryRouteResult(
           decision: QueryDecision.escalateUrgentMedical,
           deterministicResponse: ResponseTemplates.emergencyEscalation,
+          confidence: result.confidence,
+        );
+
+      case PrefilterResult.pleasantryDetected:
+        return QueryRouteResult(
+          decision: QueryDecision.conversationalAck,
+          deterministicResponse: ResponseTemplates.pleasantryAck,
           confidence: result.confidence,
         );
 

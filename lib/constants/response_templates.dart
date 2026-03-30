@@ -18,6 +18,11 @@ abstract final class ResponseTemplates {
       "I can't help with that topic, but feel free to ask about your lab "
       'values or general health questions.';
 
+  /// Shown for conversational pleasantries (thanks, okay, hi, bye).
+  static const String pleasantryAck =
+      "You're welcome! Feel free to ask about your lab values or "
+      'any health-related questions anytime.';
+
   /// Shown when the user asks for personalised interpretation but has no
   /// lab data imported yet.
   static const String needLabReport =

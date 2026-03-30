@@ -8,6 +8,9 @@ enum PrefilterResult {
   /// User message is clearly outside Koshika's health domain.
   offTopicDetected,
 
+  /// User message is a conversational pleasantry (thanks, hi, okay, bye).
+  pleasantryDetected,
+
   /// User message references specific lab tests, biomarkers, or reports.
   likelyLabQuery,
 
@@ -35,6 +38,9 @@ enum QueryDecision {
 
   /// Message is outside Koshika's domain → deterministic refusal.
   refuseOffTopic,
+
+  /// Message is a conversational pleasantry (thanks, okay, hi, bye).
+  conversationalAck,
 
   /// Message indicates a potential medical emergency → deterministic safety copy.
   escalateUrgentMedical,

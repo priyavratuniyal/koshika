@@ -298,10 +298,58 @@ class LlmService {
         conversationHistory: conversationHistory,
       );
 
+      // Known ChatML stop sequences — match these exactly to avoid
+      // false positives from '<' or '|' appearing in normal text.
+      const stopSequences = [
+        '<|im_end|>',
+        '<|im_start|>',
+        '<|end|>',
+        '<|endoftext|>',
+        '<|eot_id|>',
+      ];
+      // Length of the longest stop sequence; buffer holds this many chars
+      // to detect sequences split across tokens.
+      final maxStopLen = stopSequences.fold<int>(
+        0,
+        (m, s) => s.length > m ? s.length : m,
+      );
+      final buffer = StringBuffer();
+
       await for (final token in _engine!.generate(prompt)) {
-        if (!_isGenerating) break; // stopped by user
-        yield token;
+        if (!_isGenerating) break;
+
+        buffer.write(token);
+        final text = buffer.toString();
+
+        // Check for any known stop sequence in the buffered text.
+        int stopIdx = -1;
+        for (final seq in stopSequences) {
+          final idx = text.indexOf(seq);
+          if (idx != -1 && (stopIdx == -1 || idx < stopIdx)) {
+            stopIdx = idx;
+          }
+        }
+
+        if (stopIdx != -1) {
+          final clean = text.substring(0, stopIdx).trimRight();
+          if (clean.isNotEmpty) yield clean;
+          await stopGeneration();
+          break;
+        }
+
+        // Flush text that can't be part of a partial stop sequence.
+        final safeLen = text.length - (maxStopLen - 1);
+        if (safeLen > 0) {
+          yield text.substring(0, safeLen);
+          final remainder = text.substring(safeLen);
+          buffer.clear();
+          buffer.write(remainder);
+        }
       }
+
+      // Flush anything remaining (no stop sequence found).
+      final remaining = buffer.toString();
+      if (remaining.isNotEmpty && _isGenerating) yield remaining;
     } catch (e) {
       final msg = e.toString();
       final truncated = msg.length > 150 ? '${msg.substring(0, 150)}...' : msg;

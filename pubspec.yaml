@@ -40,6 +40,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.13.1
   pdfx: ^2.6.0
   llamadart: ^0.6.8
+  flutter_markdown: ^0.7.7
 
 hooks:
   user_defines:

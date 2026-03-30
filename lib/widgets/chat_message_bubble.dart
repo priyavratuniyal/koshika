@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:intl/intl.dart';
 
 import '../models/chat_message.dart';
@@ -99,10 +100,52 @@ class ChatMessageBubble extends StatelessWidget {
             // Message content — or streaming dots if content is empty
             if (message.content.isEmpty && message.isStreaming)
               _StreamingDots(color: textColor)
-            else
+            else if (isUser)
               SelectableText(
                 message.content,
                 style: TextStyle(color: textColor, fontSize: 15, height: 1.4),
+              )
+            else
+              MarkdownBody(
+                data: message.content,
+                selectable: true,
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(color: textColor, fontSize: 15, height: 1.4),
+                  h1: TextStyle(
+                    color: textColor,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
+                  h2: TextStyle(
+                    color: textColor,
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
+                  h3: TextStyle(
+                    color: textColor,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
+                  strong: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  em: TextStyle(color: textColor, fontStyle: FontStyle.italic),
+                  listBullet: TextStyle(color: textColor, fontSize: 15),
+                  code: TextStyle(
+                    color: textColor,
+                    backgroundColor: textColor.withValues(alpha: 0.1),
+                    fontSize: 13,
+                  ),
+                  codeblockDecoration: BoxDecoration(
+                    color: textColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  blockSpacing: 12,
+                ),
               ),
 
             // Streaming indicator appended to text

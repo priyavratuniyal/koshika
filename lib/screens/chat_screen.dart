@@ -288,7 +288,24 @@ class _ChatScreenState extends State<ChatScreen> {
       if (msg.role != ChatRole.user && msg.role != ChatRole.assistant) continue;
 
       final content = msg.content;
-      if (charsUsed + content.length > TokenBudgets.maxHistoryChars) break;
+      if (charsUsed + content.length > TokenBudgets.maxHistoryChars) {
+        // For user messages, truncate rather than skip — the router
+        // needs the prior user turn to classify ambiguous follow-ups.
+        if (msg.role == ChatRole.user) {
+          final truncated = content.substring(
+            0,
+            (TokenBudgets.maxHistoryChars - charsUsed).clamp(0, content.length),
+          );
+          if (truncated.isNotEmpty) {
+            history.insert(
+              0,
+              ChatHistoryTurn(content: truncated, isUser: true),
+            );
+          }
+        }
+        // Skip assistant messages that exceed budget
+        continue;
+      }
 
       history.insert(
         0,

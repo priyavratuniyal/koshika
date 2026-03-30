@@ -188,6 +188,39 @@ abstract final class IntentPrefilter {
     RegExp(r'\bdiabetic\b', caseSensitive: false),
   ];
 
+  // ─── Pleasantry Patterns ─────────────────────────────────────────────
+
+  static final _pleasantryPatterns = [
+    RegExp(
+      r'^(thanks|thank\s*you|thankyou|thx|ty|dhanyavaad|shukriya)\s*[.!]?$',
+      caseSensitive: false,
+    ),
+    RegExp(
+      r'^(ok|okay|ok\.|okay\.|alright|got\s*it|understood|sure)\s*[.!]?$',
+      caseSensitive: false,
+    ),
+    RegExp(
+      r'^(hi|hello|hey|namaste|good\s*(morning|evening|afternoon|night))\s*[.!]?$',
+      caseSensitive: false,
+    ),
+    RegExp(
+      r'^(bye|goodbye|good\s*bye|see\s*you|take\s*care)\s*[.!]?$',
+      caseSensitive: false,
+    ),
+    RegExp(
+      r'^(great|nice|cool|awesome|perfect|wonderful|good)\s*[.!]?$',
+      caseSensitive: false,
+    ),
+    RegExp(
+      r'^(hmm|hm+|ah|oh|ohh|aah|acha|accha|haan|ji)\s*[.!]?$',
+      caseSensitive: false,
+    ),
+    RegExp(
+      r'^(yes|no|yep|nope|yeah|nah|ya|na|haa|nahi)\s*[.!]?$',
+      caseSensitive: false,
+    ),
+  ];
+
   // ─── Off-Topic Patterns ──────────────────────────────────────────────
 
   static final _offTopicPatterns = [
@@ -318,19 +351,25 @@ abstract final class IntentPrefilter {
     // 2. Personal lab references — user is asking about *their own* data
     if (_matchesPersonalLab(lower)) return PrefilterResult.likelyLabQuery;
 
-    // 3. Off-topic — checked before biomarker/health so that a message
+    // 3. Pleasantries — short conversational messages (thanks, okay, hi)
+    for (final pattern in _pleasantryPatterns) {
+      if (pattern.hasMatch(lower.trim()))
+        return PrefilterResult.pleasantryDetected;
+    }
+
+    // 4. Off-topic — checked before biomarker/health so that a message
     //    like "write python code" isn't rescued by a stray health keyword
     for (final pattern in _offTopicPatterns) {
       if (pattern.hasMatch(lower)) return PrefilterResult.offTopicDetected;
     }
 
-    // 4. Bare biomarker mentions — educational, no personal data needed
+    // 5. Bare biomarker mentions — educational, no personal data needed
     if (_matchesBiomarker(lower)) return PrefilterResult.likelyHealthQuery;
 
-    // 5. General health keywords
+    // 6. General health keywords
     if (_matchesHealth(lower)) return PrefilterResult.likelyHealthQuery;
 
-    // 6. Default
+    // 7. Default
     return PrefilterResult.ambiguous;
   }
 
