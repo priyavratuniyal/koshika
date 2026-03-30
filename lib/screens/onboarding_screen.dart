@@ -39,12 +39,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       illustration: const _WelcomeIllustration(),
       title: 'Your Health Data\nLives Here.',
       subtitle:
-          'Not in the cloud. Not on our servers.\nRight here on your phone.',
-      badges: const [
-        'End-to-End Encryption',
-        '0% Server Storage',
-        'Patient-Centric',
-      ],
+          'Not in the cloud.\nNot on our servers.\nRight here on your phone.',
+      badges: const ['HIPAA Ready', 'Offline Mode'],
     ),
     _OnboardingPageData(
       illustration: const _HowItWorksIllustration(),
@@ -57,30 +53,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _FeatureItem(
           icon: Icons.description_outlined,
           title: 'Local PDF Parsing',
-          subtitle:
-              'Intelligent document reading that never\nleaves your smartphone\'s secure enclave.',
         ),
         _FeatureItem(
           icon: Icons.biotech_outlined,
           title: 'Biomarker Extraction',
-          subtitle:
-              'Automatically maps laboratory values\nto clinical trends and historical averages.',
         ),
         _FeatureItem(
           icon: Icons.wifi_off_rounded,
           title: 'No Internet Required',
-          subtitle:
-              'Works completely offline. Your health\ndata remains your personal property.',
         ),
       ],
+      badges: const ['Local Parsing', 'Offline AI'],
     ),
     _OnboardingPageData(
       illustration: const _PrivacyIllustration(),
       title: 'Zero Cloud.\nZero Risk.',
       subtitle:
-          'Koshika uses on-device AI to analyze\n'
-          'your reports. No data ever leaves\nyour phone.',
-      badges: const ['HIPAA Ready', 'Offline Mode'],
+          'Koshika uses on-device AI\nto analyze your reports.\nNo data ever leaves your phone.',
     ),
   ];
 
@@ -91,6 +80,69 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         curve: Curves.easeInOut,
       );
     }
+  }
+
+  Future<void> _showDataPolicySheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppColors.surface,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              KoshikaSpacing.xl,
+              KoshikaSpacing.base,
+              KoshikaSpacing.xl,
+              KoshikaSpacing.xl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Data Policy',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: KoshikaSpacing.md),
+                Text(
+                  'Koshika keeps your medical records on your device. We do not upload reports to our servers, and core analysis is designed to work offline.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: KoshikaSpacing.md),
+                Text(
+                  'You stay in control of what gets imported, viewed, and shared from the app.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: KoshikaSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: const StadiumBorder(),
+                    ),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _completeOnboarding() async {
@@ -161,42 +213,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: SizedBox(
                 width: double.infinity,
                 height: 52,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, Color(0xFF0D9488)],
-                    ),
-                    borderRadius: KoshikaRadius.pill,
-                    boxShadow: KoshikaElevation.medium,
+                child: FilledButton(
+                  onPressed: isLast ? _completeOnboarding : _goToNextPage,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    shape: const StadiumBorder(),
                   ),
-                  child: FilledButton(
-                    onPressed: isLast ? _completeOnboarding : _goToNextPage,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: const StadiumBorder(),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          buttonLabels[_currentPage],
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        buttonLabels[_currentPage],
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
-                        if (!isLast) ...[
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                        ],
+                      ),
+                      if (!isLast) ...[
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -207,7 +252,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: KoshikaSpacing.lg),
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: _showDataPolicySheet,
                   child: Text(
                     'View Data Policy',
                     style: TextStyle(color: AppColors.textSecondary),
@@ -225,8 +270,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   left: KoshikaSpacing.xl,
                   right: KoshikaSpacing.xl,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: KoshikaSpacing.sm,
+                  runSpacing: KoshikaSpacing.sm,
                   children: _pages[_currentPage].badges!.map((label) {
                     return _BadgeChip(label: label);
                   }).toList(),
@@ -264,13 +311,8 @@ class _OnboardingPageData {
 class _FeatureItem {
   final IconData icon;
   final String title;
-  final String subtitle;
 
-  const _FeatureItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
+  const _FeatureItem({required this.icon, required this.title});
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -293,8 +335,8 @@ class _OnboardingPage extends StatelessWidget {
       child: Column(
         children: [
           // Illustration
-          SizedBox(height: hasFeatures ? 200 : 240, child: data.illustration),
-          const SizedBox(height: KoshikaSpacing.xl),
+          SizedBox(height: hasFeatures ? 180 : 240, child: data.illustration),
+          SizedBox(height: hasFeatures ? KoshikaSpacing.lg : KoshikaSpacing.xl),
 
           // Title
           Text(
@@ -369,14 +411,6 @@ class _FeatureRow extends StatelessWidget {
                     color: AppColors.onSurface,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  item.subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.4,
-                  ),
-                ),
               ],
             ),
           ),
@@ -397,21 +431,31 @@ class _BadgeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.verified_rounded, size: 14, color: AppColors.primary),
-        const SizedBox(width: 4),
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            color: AppColors.textSecondary,
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerHigh,
+        borderRadius: KoshikaRadius.pill,
+        border: Border.all(
+          color: AppColors.outlineVariant.withValues(alpha: 0.5),
         ),
-      ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified_rounded, size: 14, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -504,8 +548,8 @@ class _WelcomeIllustration extends StatelessWidget {
 
         // Floating badge: "OFFLINE MODE"
         Positioned(
-          bottom: 30,
-          left: 16,
+          bottom: 44,
+          left: 20,
           child: _FloatingBadge(
             label: 'OFFLINE MODE',
             icon: Icons.wifi_off_rounded,
